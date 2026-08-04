@@ -123,7 +123,8 @@
     track: 0,
     off: 0,          // 0..1, how long we have been off the road
     leanShown: 0,    // the lean actually drawn, eased behind the input
-    boost: 0
+    boost: 0,
+    dist: 0          // total distance covered, for lap and placing
   };
 
   var MAX_SPD = 12000;           // world units per second
@@ -152,6 +153,79 @@
     }
   }
 
+  /* --------------------------------------------------------------- rivals */
+  /* Five of them, and they are meant to WIN if you drive badly. This is the one
+     place Dino Kart parts company with Dino Giungla: there the friends stopped
+     to eat blackberries so nobody could ever be last. Here they race.
+
+     What keeps it fair rather than cruel is the racing line: they hug the inside
+     of a bend, which is genuinely faster, and if you learn to do the same you
+     beat them. Nothing about their speed is secretly tied to yours. */
+  /* NO RIVAL IS FASTER THAN YOU FLAT OUT. The first spread I tried topped out at
+     1.02, and simulating ninety seconds of racing showed what that really meant:
+     driving perfectly still only got second, and driving well got fifth. A race
+     you cannot win by driving well is not difficult, it is rigged. With this
+     spread, perfect driving wins, good driving is a fight for the podium, and
+     spending a quarter of the lap on the grass puts you last — which is exactly
+     the shape it should have. */
+  var RIVALS = [
+    { name: 'Pippi', color: '#ff6fae', skill: 0.88 },
+    { name: 'Bubu', color: '#4d80e4', skill: 0.91 },
+    { name: 'Momo', color: '#ffd75e', skill: 0.94 },
+    { name: 'Nina', color: '#38d9a9', skill: 0.965 },
+    { name: 'Rufo', color: '#ff9f43', skill: 0.99 }
+  ];
+  var rivals = [];
+
+  function buildRivals() {
+    rivals.length = 0;
+    for (var i = 0; i < RIVALS.length; i++) {
+      var r = RIVALS[i];
+      rivals.push({
+        name: r.name, color: r.color, skill: r.skill,
+        z: wrapZ(-(i + 1) * SEG_LEN * 2.2),
+        dist: -(i + 1) * SEG_LEN * 2.2,
+        x: (i % 2 ? 1 : -1) * (0.28 + (i * 0.14)),
+        spd: 0,
+        wob: i * 1.7
+      });
+    }
+  }
+
+  function updateRivals(dt) {
+    var i, r, here, want, top, dxp;
+    for (i = 0; i < rivals.length; i++) {
+      r = rivals[i];
+      here = segAt(r.z);
+      top = MAX_SPD * r.skill * (Math.abs(r.x) < 1 ? 1 : 0.38);
+      r.spd += G.clamp(top - r.spd, -BRAKE * dt, ACCEL * dt);
+      r.spd = G.clamp(r.spd, 0, MAX_SPD * 1.05);
+
+      /* Aim for the inside of the bend: on a right-hander the fast line is to
+         the right. Wander a little so five karts are not one kart drawn five
+         times. */
+      want = here.curve * 0.11 + Math.sin(G.t * 0.6 + r.wob) * 0.18;
+      want = G.clamp(want, -0.82, 0.82);
+
+      // give the player room rather than shunting him: they are opponents, not obstacles
+      dxp = wrapDelta(r.z, S.z);
+      if (Math.abs(dxp) < SEG_LEN * 2 && Math.abs(r.x - S.x) < 0.42) {
+        want += (r.x >= S.x ? 1 : -1) * 0.5;
+      }
+      r.x += G.clamp(want - r.x, -dt * 1.6, dt * 1.6);
+      r.x = G.clamp(r.x, -1.6, 1.6);
+
+      r.z = wrapZ(r.z + r.spd * dt);
+      r.dist += r.spd * dt;
+    }
+  }
+
+  /* Signed shortest distance from a to b around the loop. */
+  function wrapDelta(a, b) {
+    var d = wrapZ(b - a);
+    return d > trackLen / 2 ? d - trackLen : d;
+  }
+
   /* -------------------------------------------------------------- project */
   /* One divide per point. `cx` is the accumulated fake curve at that segment,
      `cy` its world height. */
@@ -173,8 +247,9 @@
     enter: function () {
       buildTrack(TRACKS[S.track]);
       buildProps();
+      buildRivals();
       S.z = 0; S.x = 0; S.spd = 0; S.steer = 0; S.off = 0;
-      S.leanShown = 0; S.boost = 0;
+      S.leanShown = 0; S.boost = 0; S.dist = 0;
     },
 
     update: function (dt) {
@@ -208,6 +283,9 @@
          weight. */
       S.leanShown += (S.steer * grip - S.leanShown) * Math.min(1, dt * 9);
       S.boost = Math.max(0, S.boost - dt * 1.6);
+
+      updateRivals(dt);
+      S.dist += S.spd * dt;
     },
 
     onDown: function (p) { S.steer = p.x < W / 2 ? -1 : 1; },
@@ -254,6 +332,7 @@
     }
 
     drawProps(c);
+    drawRivals(c);
     drawKart(c);
     void drawn;
   }
@@ -318,6 +397,30 @@
           c.fill();
           c.strokeStyle = C.ink; c.lineWidth = Math.max(1, h * 0.03); c.stroke();
         }
+      }
+    }
+  }
+
+  /* Rivals, painted from the back of the draw list forwards so a nearer kart
+     covers a farther one, and so a hill hides whoever is behind it — the same
+     ordering the road itself uses. Their size comes from the segment they stand
+     on, which is why nothing here needs a second projection. */
+  function drawRivals(c) {
+    var i, j, r, di, sh, x, sz;
+    for (i = shots.length - 1; i >= 0; i--) {
+      sh = shots[i];
+      for (j = 0; j < rivals.length; j++) {
+        r = rivals[j];
+        di = Math.round(wrapDelta(S.z, r.z) / SEG_LEN);
+        if (di !== i || di < 1) continue;         // behind us, or not this slice
+        sz = sh.sc * 2600 * W / 2;
+        if (sz < 6) continue;
+        x = sh.x + sh.w * r.x;
+        A.kartBack(c, x, sh.y, sz, {
+          color: r.color,
+          lean: G.clamp(segAt(r.z).curve * 0.12, -1, 1),
+          bob: 0
+        });
       }
     }
   }
