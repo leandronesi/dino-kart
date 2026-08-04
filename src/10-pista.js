@@ -121,7 +121,9 @@
     spd: 0,
     steer: 0,        // -1..1, what the finger is asking for
     track: 0,
-    off: 0           // 0..1, how long we have been off the road
+    off: 0,          // 0..1, how long we have been off the road
+    leanShown: 0,    // the lean actually drawn, eased behind the input
+    boost: 0
   };
 
   var MAX_SPD = 12000;           // world units per second
@@ -172,6 +174,7 @@
       buildTrack(TRACKS[S.track]);
       buildProps();
       S.z = 0; S.x = 0; S.spd = 0; S.steer = 0; S.off = 0;
+      S.leanShown = 0; S.boost = 0;
     },
 
     update: function (dt) {
@@ -199,6 +202,12 @@
          you fight rather than something you watch go by. */
       S.x -= here.curve * dt * grip * 0.55;
       S.x = G.clamp(S.x, -2.4, 2.4);
+
+      /* The drawn lean lags the finger. Snapping it makes the kart look like a
+         cardboard cut-out being flicked; a tenth of a second of lag reads as
+         weight. */
+      S.leanShown += (S.steer * grip - S.leanShown) * Math.min(1, dt * 9);
+      S.boost = Math.max(0, S.boost - dt * 1.6);
     },
 
     onDown: function (p) { S.steer = p.x < W / 2 ? -1 : 1; },
@@ -245,7 +254,7 @@
     }
 
     drawProps(c);
-    drawKartPlaceholder(c);
+    drawKart(c);
     void drawn;
   }
 
@@ -324,18 +333,19 @@
     c.fill();
   }
 
-  /* Stands in for the kart until the dino seen from behind exists. */
-  function drawKartPlaceholder(c) {
-    var x = W / 2 + S.x * 90, y = H - 90;
-    c.save();
-    c.globalAlpha = 0.25; c.fillStyle = '#000';
-    c.beginPath(); c.ellipse(x, y + 44, 96, 20, 0, 0, 7); c.fill();
-    c.restore();
-    c.fillStyle = (G.account && G.account.color) || C.dino;
-    G.roundRect(c, x - 78, y - 40, 156, 84, 18); c.fill();
-    c.strokeStyle = C.ink; c.lineWidth = 6; c.stroke();
-    c.fillStyle = C.barkDark;
-    G.roundRect(c, x - 96, y + 10, 34, 46, 10); c.fill();
-    G.roundRect(c, x + 62, y + 10, 34, 46, 10); c.fill();
+  /* The player's kart sits at a fixed place on screen and only leans; the world
+     moves under it. Its sideways drift on screen is small on purpose — a kart
+     that slides across the whole screen makes the road look like it is sliding
+     instead. */
+  function drawKart(c) {
+    var lean = S.leanShown;
+    var bump = Math.sin(S.z * 0.004) * (S.spd / MAX_SPD) * (S.off > 0.4 ? 2.6 : 0.6);
+    A.kartBack(c, W / 2 + S.x * 64, H - 74, 210, {
+      color: (G.account && G.account.color) || C.dino,
+      lean: lean,
+      bob: bump,
+      hat: typeof G.save.hat === 'string' ? G.save.hat : null,
+      boost: S.boost || 0
+    });
   }
 })();
