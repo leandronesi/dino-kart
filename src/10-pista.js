@@ -120,10 +120,35 @@
     x: 0,            // sideways position: -1 = left edge, +1 = right edge
     spd: 0,
     steer: 0,        // -1..1, what the finger is asking for
-    track: 0
+    track: 0,
+    off: 0           // 0..1, how long we have been off the road
   };
 
   var MAX_SPD = 12000;           // world units per second
+  var OFF_SPD = MAX_SPD * 0.38;  // top speed on the grass
+  var ACCEL = MAX_SPD * 0.62;    // per second
+  var BRAKE = MAX_SPD * 1.30;    // per second when off the road
+
+  /* Roadside objects. They do almost nothing mechanically and they are the whole
+     reason a corner feels fast: with an empty verge, a road that scrolls at
+     12000 units a second and one that scrolls at 4000 look nearly identical.
+     Placed once per track, at a fixed side offset. */
+  var props = [];
+  function buildProps() {
+    props.length = 0;
+    var i, n = Math.floor(segs.length / 4);
+    for (i = 0; i < n; i++) {
+      var si = i * 4 + (i % 3);
+      if (si >= segs.length) break;
+      var side = (i % 2 ? 1 : -1);
+      props.push({
+        seg: si,
+        x: side * (1.35 + ((i * 37) % 11) / 11 * 1.5),
+        kind: (i % 5 === 0) ? 'cartello' : 'albero',
+        h: 900 + ((i * 53) % 7) * 130
+      });
+    }
+  }
 
   /* -------------------------------------------------------------- project */
   /* One divide per point. `cx` is the accumulated fake curve at that segment,
@@ -145,18 +170,34 @@
 
     enter: function () {
       buildTrack(TRACKS[S.track]);
-      S.z = 0; S.x = 0; S.spd = MAX_SPD * 0.55; S.steer = 0;
+      buildProps();
+      S.z = 0; S.x = 0; S.spd = 0; S.steer = 0; S.off = 0;
     },
 
     update: function (dt) {
+      var here = segAt(S.z);
+      var onRoad = Math.abs(S.x) < 1;
+
+      /* The throttle is automatic — a child who has to hold a pedal AND steer
+         has two jobs, and steering is the one that matters. What the road takes
+         away is speed when you leave it, and that is the whole punishment
+         model: no crash, no spin, no reset, just a slower kart and the pack
+         pulling away. Losing here is a thing you watch happen, not a screen. */
+      var top = onRoad ? MAX_SPD : OFF_SPD;
+      if (S.spd < top) S.spd += ACCEL * dt;
+      else S.spd -= BRAKE * dt;
       S.spd = G.clamp(S.spd, 0, MAX_SPD);
+      S.off = onRoad ? Math.max(0, S.off - dt * 3) : Math.min(1, S.off + dt * 3);
+
       S.z = wrapZ(S.z + S.spd * dt);
 
-      var here = segAt(S.z);
-      /* Steering, plus the outward push of the bend — the thing that makes a
-         corner something you fight rather than something you watch. */
-      S.x += S.steer * dt * 2.4;
-      S.x -= here.curve * dt * (S.spd / MAX_SPD) * 0.55;
+      /* Steering scales with speed: standing still you cannot turn, which is
+         both true and what keeps the kart from pirouetting at the start line. */
+      var grip = S.spd / MAX_SPD;
+      S.x += S.steer * dt * 2.1 * grip;
+      /* The outward push of the bend — the thing that makes a corner something
+         you fight rather than something you watch go by. */
+      S.x -= here.curve * dt * grip * 0.55;
       S.x = G.clamp(S.x, -2.4, 2.4);
     },
 
@@ -178,27 +219,34 @@
 
     /* Walk forward accumulating the fake curve. `dx` is how much the road
        shifts per segment; `cx` the running total. */
-    var cx = 0, dx = 0, i, s, prev = null, py = H, maxy = H;
+    /* Two passes. First the ribbon back-to-front, remembering where each
+       segment landed; then the roadside objects painted over it in the same
+       order, so a tree can never be swallowed by the tarmac drawn after it. */
+    var base0 = Math.floor(wrapZ(S.z) / SEG_LEN);
+    var cx = 0, dx = 0, i, s, prev = null, maxy = H, drawn = 0;
+    shots.length = 0;
     for (i = 0; i < DRAW_N; i++) {
-      s = segs[(Math.floor(wrapZ(S.z) / SEG_LEN) + i) % segs.length];
-      var segZ = Math.floor(wrapZ(S.z) / SEG_LEN) * SEG_LEN + i * SEG_LEN;
+      s = segs[(base0 + i) % segs.length];
+      var segZ = base0 * SEG_LEN + i * SEG_LEN;
       dx += s.curve * 0.00018;
       cx += dx;
 
       var p = project(cx - S.x * 0.9, s.y, segZ, 0, camY, camZ);
-      var cur = { x: p.x, y: p.y, w: p.w, s: s };
+      var cur = { x: p.x, y: p.y, w: p.w, sc: p.s, idx: (base0 + i) % segs.length };
 
       if (prev && cur.y < maxy && cur.y < prev.y) {
         drawSeg(c, prev, cur, s.dark);
         maxy = cur.y;
+        drawn++;
       }
+      shots.push(cur);
       prev = cur;
-      py = cur.y;
-      if (cur.y < HORIZON - 40) break;    // past the vanishing point
+      if (cur.y < HORIZON - 40) break;
     }
-    void py;
 
+    drawProps(c);
     drawKartPlaceholder(c);
+    void drawn;
   }
 
   function drawSky(c, t) {
@@ -225,6 +273,43 @@
 
     if (!dark) {                            // centre line, only on light strips
       quad(c, a.x, a.y, a.w * 0.03, b.x, b.y, b.w * 0.03, COL.laneMark);
+    }
+  }
+
+  /* Where every drawn segment landed this frame, so anything standing beside
+     the road can be placed without projecting it a second time. */
+  var shots = [];
+
+  function drawProps(c) {
+    var i, p, sh, x, h, w;
+    for (i = shots.length - 1; i >= 0; i--) {
+      sh = shots[i];
+      if (sh.w < 2) continue;
+      for (var j = 0; j < props.length; j++) {
+        p = props[j];
+        if (p.seg !== sh.idx) continue;
+        x = sh.x + sh.w * p.x;
+        h = sh.sc * p.h * H / 2;
+        if (h < 3 || x < -200 || x > W + 200) continue;
+        w = h * 0.62;
+        if (p.kind === 'albero') {
+          c.fillStyle = '#5a4326';
+          c.fillRect(x - w * 0.08, sh.y - h * 0.34, w * 0.16, h * 0.34);
+          c.fillStyle = '#2f7a3a';
+          c.beginPath();
+          c.moveTo(x, sh.y - h);
+          c.lineTo(x + w * 0.5, sh.y - h * 0.30);
+          c.lineTo(x - w * 0.5, sh.y - h * 0.30);
+          c.closePath(); c.fill();
+        } else {
+          c.fillStyle = '#7a4a26';
+          c.fillRect(x - w * 0.05, sh.y - h * 0.5, w * 0.10, h * 0.5);
+          c.fillStyle = C.sun;
+          G.roundRect(c, x - w * 0.42, sh.y - h, w * 0.84, h * 0.52, h * 0.08);
+          c.fill();
+          c.strokeStyle = C.ink; c.lineWidth = Math.max(1, h * 0.03); c.stroke();
+        }
+      }
     }
   }
 
