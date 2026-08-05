@@ -1433,7 +1433,7 @@ html, body {
     phase: 'via',    // 'via' = countdown | 'gara' | 'fine'
     t: 0,            // seconds in the current phase
     lapT: 0, best: 0, lapShown: 0,
-    place: 1, laps: 3, lap: 1, lit: -1, newBest: false,
+    place: 1, laps: 3, lap: 1, lit: -1, newBest: false, farX: 640,
     rivalScale: 1,
     drift: 0,        // seconds held at full lock in a bend
     took: 0,         // boxes collected this race, for the results screen
@@ -1647,6 +1647,7 @@ html, body {
       lapT: S.lapT, best: S.lapShown, trackLen: trackLen,
       steerRate: STEER_RATE, centrif: CENTRIF, maxCurve: maxCurve(),
       drift: S.drift, boost: S.boost, took: S.took, boxes: boxes.length,
+      farX: S.farX,
       maxSpd: MAX_SPD, boostMul: BOOST_MUL, drift2: DRIFT_2
     };
   };
@@ -1872,6 +1873,13 @@ html, body {
       prev = cur;
       if (cur.y < HORIZON - 40) break;
     }
+    /* How far off centre the road has swept by the time it reaches the horizon.
+       In a long bend this is SUPPOSED to be large — that sweep is the whole look
+       of the technique — but if it runs to thousands of pixels the road just
+       stops in mid-air at the side of the screen instead of vanishing into it,
+       and there is nothing on screen to drive towards. The smoke test watches
+       it, because nothing else would. */
+    S.farX = shots.length ? shots[shots.length - 1].x : W / 2;
 
     drawProps(c);
     drawBoxes(c);

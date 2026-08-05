@@ -484,12 +484,23 @@ if (G.sceneOf("pista") && G.kartTracks) {
     G.go("pista"); pump(30);
     pump(220);                                 // oltre il semaforo, poi mani in mano
 
-    let off = 0, n = 0;
+    let off = 0, n = 0, farMin = 1e9, farMax = -1e9;
     for (n = 0; n < 14000; n++) {
       const s2 = G.kartState();
       if (s2.phase === "fine") break;
       if (Math.abs(s2.x) >= 1) off++;
+      if (s2.farX < farMin) farMin = s2.farX;
+      if (s2.farX > farMax) farMax = s2.farX;
       pump(1);
+    }
+    /* IN CURVA LA STRADA DEVE ANDARE A FINIRE DA QUALCHE PARTE CHE SI VEDE.
+       Le curve finte si accumulano verso l orizzonte: allungando i curvoni da
+       46 a 170 segmenti l accumulo e triplicato, e una curva abbastanza lunga
+       manda il punto di fuga fuori dallo schermo. Non e un errore, non c e
+       nessun NaN: semplicemente la strada si interrompe a mezz aria di lato e
+       non hai piu niente verso cui guidare. Nessun altra asserzione lo vede. */
+    if (farMin < -500 || farMax > 1280 + 500) {
+      fail(tracks[ti].name + ": in curva la strada sparisce di lato, orizzonte da " + Math.round(farMin) + " a " + Math.round(farMax) + "px");
     }
     const end = G.kartState();
     const who = tracks[ti].name;
