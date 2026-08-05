@@ -44,8 +44,12 @@
 
   if (window.speechSynthesis) { try { speechSynthesis.getVoices(); } catch (e) {} }
 
+  /* The engine came from a game whose home is a jungle. Here it is the menu, and
+     without this the back button would call G.go on a scene that does not exist. */
+  G.home = function () { G.go('menu'); };
+
   var last = G.accounts.last(), a = last && G.accounts.byId(last);
   if (!a) a = G.accounts.create({ name: 'Pilota', color: '#57c98a', level: 2, secret: null });
   G.accounts.login(a.id);
-  G.start('pista');
+  G.start('menu');
 })();

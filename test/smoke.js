@@ -273,13 +273,27 @@ if (G.sceneOf("pista")) {
   pump(60);
   if (drawCount < 2000) fail("la strada disegna quasi nulla: " + drawCount + " operazioni in 60 frame");
 
-  // steer left and right for a while: the kart must stay on a sane part of the world
-  for (let i = 0; i < 400; i++) {
-    if (i % 80 === 0) tap(200, 500);
-    if (i % 80 === 40) tap(1080, 500);
-    pump(1);
-  }
-  pump(200);
+  // STEERING MUST ACTUALLY MOVE THE KART. Nothing asserted this before.
+  pump(120);                                   // let it get up to speed
+  const st0 = G.kartState();
+  if (st0.spd < 1000) fail("il kart non accelera: velocita " + Math.round(st0.spd));
+
+  ELS.c.dispatch("pointerdown", pev(1080, 500));
+  for (let i = 0; i < 90; i++) { ELS.c.dispatch("pointermove", pev(1080, 500)); pump(1); }
+  ELS.c.dispatch("pointerup", pev(1080, 500));
+  const stR = G.kartState();
+  if (stR.x <= st0.x + 0.05) fail("toccando a destra il kart non va a destra: x " + st0.x.toFixed(3) + " -> " + stR.x.toFixed(3));
+
+  ELS.c.dispatch("pointerdown", pev(200, 500));
+  for (let i = 0; i < 140; i++) { ELS.c.dispatch("pointermove", pev(200, 500)); pump(1); }
+  ELS.c.dispatch("pointerup", pev(200, 500));
+  const stL = G.kartState();
+  if (stL.x >= stR.x - 0.05) fail("toccando a sinistra il kart non va a sinistra: x " + stR.x.toFixed(3) + " -> " + stL.x.toFixed(3));
+
+  // and releasing must stop the steering, not leave it stuck
+  const xa = G.kartState().x; pump(60);
+  const xb = G.kartState().x;
+  if (Math.abs(xb - xa) > 0.35) fail("lo sterzo resta incastrato dopo il rilascio: x " + xa.toFixed(3) + " -> " + xb.toFixed(3));
 }
 
 phase = "salvataggio";

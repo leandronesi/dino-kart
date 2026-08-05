@@ -68,6 +68,8 @@
     }
   ];
 
+  G.kartTracks = function () { return TRACKS; };
+
   var segs = [];
   var trackLen = 0;
 
@@ -124,13 +126,20 @@
     off: 0,          // 0..1, how long we have been off the road
     leanShown: 0,    // the lean actually drawn, eased behind the input
     boost: 0,
-    dist: 0          // total distance covered, for lap and placing
+    dist: 0,         // total distance covered, for lap and placing
+    phase: 'via',    // 'via' = countdown | 'gara' | 'fine'
+    t: 0,            // seconds in the current phase
+    lapT: 0, best: 0, lapShown: 0,
+    place: 1, laps: 3,
+    order: []
   };
 
   var MAX_SPD = 12000;           // world units per second
   var OFF_SPD = MAX_SPD * 0.38;  // top speed on the grass
   var ACCEL = MAX_SPD * 0.62;    // per second
   var BRAKE = MAX_SPD * 1.30;    // per second when off the road
+  var STEER_RATE = 1.0;          // road-widths per second at full lock, full speed
+  var CENTRIF = 0.125;           // outward push per unit of curve
 
   /* Roadside objects. They do almost nothing mechanically and they are the whole
      reason a corner feels fast: with an empty verge, a road that scrolls at
@@ -240,9 +249,15 @@
     return pr;
   }
 
+  /* Read-only window on the driving state, so the headless test can assert that
+     steering actually moves the kart. Nothing in the game reads it. */
+  G.kartState = function () {
+    return { x: S.x, spd: S.spd, z: S.z, steer: S.steer, off: S.off, dist: S.dist };
+  };
+
   /* ================================================================ SCENE */
   G.scene('pista', {
-    hud: true, back: false,
+    hud: true, back: true,
 
     enter: function () {
       buildTrack(TRACKS[S.track]);
@@ -272,10 +287,16 @@
       /* Steering scales with speed: standing still you cannot turn, which is
          both true and what keeps the kart from pirouetting at the start line. */
       var grip = S.spd / MAX_SPD;
-      S.x += S.steer * dt * 2.1 * grip;
+      /* Crossing from the middle of the road to its edge takes about a second at
+         full speed. It used to take half of one, which meant a single touch put
+         you on the grass before you saw anything move. */
+      S.x += S.steer * dt * STEER_RATE * grip;
       /* The outward push of the bend — the thing that makes a corner something
          you fight rather than something you watch go by. */
-      S.x -= here.curve * dt * grip * 0.55;
+      /* The outward push must stay comfortably WEAKER than the steering, or a
+         bend is not a corner to fight, it is a wall. At the sharpest curve on
+         this track it is about half of full lock. */
+      S.x -= here.curve * dt * grip * CENTRIF;
       S.x = G.clamp(S.x, -2.4, 2.4);
 
       /* The drawn lean lags the finger. Snapping it makes the kart look like a
@@ -315,10 +336,15 @@
     for (i = 0; i < DRAW_N; i++) {
       s = segs[(base0 + i) % segs.length];
       var segZ = base0 * SEG_LEN + i * SEG_LEN;
-      dx += s.curve * 0.00018;
+      /* Both terms are in WORLD units, the same units as ROAD_W. This is the
+         bug that made the whole track look straight: the accumulated curve used
+         to be scaled by 0.00018, which moved the road by a tenth of a pixel at a
+         hundred segments while the physics happily pushed the kart off a bend it
+         could not see. */
+      dx += s.curve;
       cx += dx;
 
-      var p = project(cx - S.x * 0.9, s.y, segZ, 0, camY, camZ);
+      var p = project(cx - S.x * ROAD_W, s.y, segZ, 0, camY, camZ);
       var cur = { x: p.x, y: p.y, w: p.w, sc: p.s, idx: (base0 + i) % segs.length };
 
       if (prev && cur.y < maxy && cur.y < prev.y) {
@@ -413,8 +439,12 @@
         r = rivals[j];
         di = Math.round(wrapDelta(S.z, r.z) / SEG_LEN);
         if (di !== i || di < 1) continue;         // behind us, or not this slice
-        sz = sh.sc * 2600 * W / 2;
-        if (sz < 6) continue;
+        /* Size comes from how wide the ROAD is at that segment, so a kart is
+           always about the same fraction of the lane. It used to be a constant
+           times the projection scale, which made the nearest rivals seven
+           thousand pixels wide and they drove straight over the camera. */
+        sz = sh.w * 0.86;
+        if (sz < 6 || sz > W * 0.9) continue;
         x = sh.x + sh.w * r.x;
         A.kartBack(c, x, sh.y, sz, {
           color: r.color,
