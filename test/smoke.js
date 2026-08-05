@@ -480,6 +480,85 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
    niente eccezione, niente disegno sbagliato: solo un gioco che non era un
    gioco. Un collaudo che guida bene non se ne accorge mai.
    Quindi qui non si guida affatto, e si pretende di perdere. */
+/* LE ARMI DEVONO ARRIVARE E DEVONO SERVIRE.
+   "La cosa divertente è sparargli roba." Quindi non basta che il proiettile
+   parta e che compaia un cartello: deve raggiungere qualcuno, quel qualcuno
+   deve rallentare davvero, e il rallentamento deve sopravvivere alla banda di
+   recupero — altrimenti tirare il cocco è uno spettacolo senza conseguenze. */
+phase = "armi";
+if (G.sceneOf("pista")) {
+  G.kartSave().diff = 1;
+  G.kartSave().track = 0;
+  G.go("pista"); pump(30);
+  pump(230);
+
+  // guido finche non mi ritrovo qualcosa in mano
+  let held = null, drove = 0;
+  for (drove = 0; drove < 3000 && !held; drove++) {
+    const s2 = G.kartState();
+    if (s2.x > 0.25) ELS.c.dispatch("pointermove", pev(200, 400));
+    else if (s2.x < -0.25) ELS.c.dispatch("pointermove", pev(1080, 400));
+    ELS.c.dispatch("pointerdown", pev(s2.x > 0 ? 200 : 1080, 400));
+    pump(1);
+    held = G.kartState().ammo;
+  }
+  ELS.c.dispatch("pointerup", pev(640, 400));
+  pump(1);
+
+  if (!held) {
+    fail("in " + drove + " frame non ho mai trovato un'arma nelle casse");
+  } else {
+    const fy = G.kartState().fireY;
+
+    /* IL TASTO DI FUOCO NON DEVE RUBARE LO STERZO quando le mani sono vuote,
+       e deve rubarlo quando sono piene: altrimenti o non spari mai, o hai una
+       zona morta in fondo allo schermo che nessuno ti ha spiegato. */
+    ELS.c.dispatch("pointerdown", pev(1080, fy + 40));
+    pump(1);
+    if (G.kartState().ammo) fail("premendo sulla fascia in fondo con l'arma in mano non ho sparato");
+    if (Math.abs(G.kartState().steer) > 0.01) fail("il tasto di fuoco sterza anche: mi manda fuori strada ogni volta che sparo");
+    ELS.c.dispatch("pointerup", pev(1080, fy + 40));
+    pump(1);
+
+    /* Un proiettile che ha gia colpito e sparito, quindi "vola qualcosa" e
+       "ha preso qualcuno" sono la stessa buona notizia: con gli avversari a un
+       paio di segmenti il cocco arriva nello stesso frame in cui parte. */
+    const after = G.kartState();
+    if (held !== "fulmine" && after.bullets < 1 && after.hits < 1) {
+      fail("ho tirato un " + held + " ma non e partito niente");
+    }
+
+    // e il colpo deve arrivare addosso a qualcuno
+    let hit = 0;
+    for (let i = 0; i < 400 && !hit; i++) { pump(1); hit = G.kartState().hits; }
+    if (!hit) fail("il colpo non prende mai nessuno: " + held);
+
+    /* E DEVE RALLENTARLO SUL SERIO. Il rallentamento va applicato DOPO la banda
+       di recupero: messo prima, la banda gli avrebbe restituito quasi tutto
+       quello che il colpo gli aveva tolto, e tirare il cocco sarebbe stato un
+       bell'effetto senza nessuna conseguenza. */
+    // mezzo secondo per frenare: un kart colpito non si ferma sul posto
+    let hs = -1;
+    for (let i = 0; i < 45; i++) { pump(1); const q = G.kartState(); if (q.hitSpd >= 0) hs = q.hitSpd; }
+    if (hs < 0) {
+      fail("dopo il colpo nessuno risulta colpito abbastanza a lungo da frenare");
+    } else if (hs > G.kartState().maxSpd * 0.55) {
+      fail("il colpo non rallenta: il kart colpito va ancora a " + Math.round(hs));
+    }
+
+    // a mani vuote la stessa fascia deve tornare a sterzare
+    while (G.kartState().ammo) { pump(1); }
+    ELS.c.dispatch("pointerdown", pev(1080, fy + 40));
+    pump(2);
+    if (Math.abs(G.kartState().steer) < 0.9) {
+      fail("a mani vuote la fascia in fondo non sterza: c'e una zona morta");
+    }
+    ELS.c.dispatch("pointerup", pev(1080, fy + 40));
+    pump(1);
+  }
+  G.go("menu"); pump(30);
+}
+
 phase = "chi non guida perde";
 if (G.sceneOf("pista") && G.kartTracks) {
   const tracks = G.kartTracks();

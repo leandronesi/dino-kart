@@ -125,8 +125,17 @@ tracks.forEach((track, ti) => {
     if (Math.abs(mid - W / 2) > 40) {
       fail(label + ': il kart e disegnato a x=' + Math.round(mid) + ' invece che al centro (' + (W / 2) + ')');
     }
-    if (kind(px(Math.round(mid), H - 10)) !== 'strada') {
-      fail(label + ': stando in mezzo alla strada, sotto il kart non c e asfalto');
+    /* Il terreno ACCANTO alle ruote, e sopra la fascia del tasto di fuoco.
+       Campionare sotto il kart in fondo allo schermo ha smesso di funzionare il
+       giorno in cui e comparsa la barra "TIRA!": leggevo il colore della scritta
+       e concludevo che il dino stesse guidando su un cocco. Il difetto vero da
+       beccare — kart disegnato accanto alla pista — si vede lo stesso, e senza
+       farsi ingannare dall interfaccia. */
+    const GY = 600;
+    const left = kind(px(Math.round(mid) - 250, GY));
+    const right = kind(px(Math.round(mid) + 250, GY));
+    if (left !== 'strada' && right !== 'strada') {
+      fail(label + ': stando in mezzo alla strada, accanto al kart non c e asfalto');
     }
   }
 
@@ -170,7 +179,7 @@ tracks.forEach((track, ti) => {
   if (Math.abs(off.x) < 1.2) {
     fail(label + ': il test non e riuscito a uscire di strada, x=' + off.x.toFixed(2));
   } else {
-    const s = roadSpan(560);
+    const s = roadSpan(600);
     if (s.px < 220) {
       fail(label + ': fuori strada si vedono solo ' + s.px + 'px di asfalto: la pista sparisce');
     }

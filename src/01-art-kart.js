@@ -188,5 +188,67 @@
     });
   };
 
+  /* Le tre cose che si tirano. Disegnate una volta e riscalate dalla distanza,
+     esattamente come i kart: quello che vola deve rimpicciolire con la strada o
+     smette di sembrare che stia sulla strada.
+
+     (x, y) è il centro dell'oggetto in volo, `s` la sua larghezza sullo
+     schermo, `ph` una fase che scorre per farlo girare e ronzare. */
+  A.arma = function (c, x, y, s, kind, ph) {
+    ph = ph || 0;
+    var lw = _lw(s * 1.6);
+    c.save();
+    c.translate(x, y);
+
+    if (kind === 'cocco') {
+      c.rotate(ph * 5);
+      c.beginPath();
+      _ell(c, 0, 0, s * 0.5, s * 0.44, 0);
+      _shape(c, '#8a5a2c', lw);
+      c.fillStyle = '#5e3a18';
+      [[-0.16, -0.10], [0.16, -0.10], [0, 0.16]].forEach(function (p) {
+        c.beginPath(); c.arc(p[0] * s, p[1] * s, s * 0.075, 0, TAU); c.fill();
+      });
+      // tre peli, perché una noce di cocco senza peli è un sasso
+      c.strokeStyle = '#6b4420'; c.lineWidth = Math.max(1, s * 0.05);
+      [-0.5, 0, 0.5].forEach(function (a) {
+        c.beginPath();
+        c.moveTo(Math.sin(a) * s * 0.3, -s * 0.38);
+        c.lineTo(Math.sin(a) * s * 0.44, -s * 0.62);
+        c.stroke();
+      });
+
+    } else if (kind === 'api') {
+      /* Uno sciame: una nuvoletta e tre api che ci girano dentro. Il movimento
+         è tutto nella fase, così lo sciame non è mai fermo. */
+      c.save();
+      c.globalAlpha = 0.16; c.fillStyle = '#fff6e0';
+      _ell(c, 0, 0, s * 0.66, s * 0.52, 0); c.fill();
+      c.restore();
+      for (var i = 0; i < 3; i++) {
+        var a = ph * 7 + i * 2.1;
+        var bx = Math.cos(a) * s * 0.34, by = Math.sin(a * 1.3) * s * 0.26;
+        c.beginPath();
+        _ell(c, bx, by, s * 0.21, s * 0.17, 0);
+        _shape(c, '#ffe066', lw * 0.7);
+        c.fillStyle = INK;
+        c.fillRect(bx - s * 0.07, by - s * 0.16, s * 0.06, s * 0.32);
+      }
+
+    } else {
+      // fulmine: una saetta, se mai dovesse volare invece di colpire subito
+      c.beginPath();
+      c.moveTo(-s * 0.18, -s * 0.5);
+      c.lineTo(s * 0.22, -s * 0.08);
+      c.lineTo(s * 0.02, -s * 0.04);
+      c.lineTo(s * 0.2, s * 0.5);
+      c.lineTo(-s * 0.22, s * 0.02);
+      c.lineTo(-s * 0.02, -s * 0.02);
+      c.closePath();
+      _shape(c, '#7fd7ff', lw);
+    }
+    c.restore();
+  };
+
   A._kart_ok = true;
 })();

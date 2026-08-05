@@ -55,6 +55,7 @@
      entirely and you were alone in a field with a tree, with no way to tell
      which way the track had gone — the single worst thing in the game. */
   var OFF_MAX = 1.30;
+  var FIRE_Y = 618;              // sotto questa riga, ad arma carica, si spara
 
   /* Palette of whatever track is loaded. Swapped wholesale in buildTrack, so
      nothing downstream has to know which track it is drawing. */
@@ -291,6 +292,8 @@
     lapT: 0, best: 0, lapShown: 0,
     place: 1, laps: 3, lap: 1, lit: -1, newBest: false, farX: 640,
     rivalScale: 1,
+    ammo: null,      // l arma che porto, una sola
+    armaFlash: 0, flash: 0,
     drift: 0,        // seconds held at full lock in a bend
     took: 0,         // boxes collected this race, for the results screen
     order: null
@@ -368,6 +371,31 @@
      the rivals top out at flat out and would never see you again. Every 120
      segments means roughly one row every two seconds, so you are boosting about
      half the time — and the rivals take them too, so the sums still add up. */
+  /* ---------------------------------------------------------------- armi */
+  /* "La cosa divertente è sparargli roba, non andare più veloce senza nessuno
+     da vedere." Quindi: dentro le casse non c'è più solo la spinta, ci sono
+     tre cose da tirare addosso a chi ti sta davanti.
+
+     Tutte e tre fanno la stessa cosa in modi diversi — rallentano qualcuno per
+     un paio di secondi — e la differenza è COME arrivano, che è quello che un
+     bambino guarda. Il cocco lo devi mirare, le api arrivano da sole, il
+     fulmine li prende tutti. Se ne porta una alla volta: niente inventario,
+     niente scelta, niente da spiegare.
+
+     Non c'è nessun oggetto che ti difende, perché per ora gli avversari non
+     tirano niente. Prima deve essere divertente sparare; poi si vedrà se è
+     divertente essere colpiti. */
+  var ARMI = {
+    turbo:   { nome: 'TURBO',   col: '#ffd75e', dice: 'Turbo!' },
+    cocco:   { nome: 'COCCO',   col: '#a4703c', dice: 'Cocco!' },
+    api:     { nome: 'API',     col: '#ffe066', dice: 'Le api!' },
+    fulmine: { nome: 'FULMINE', col: '#7fd7ff', dice: 'Fulmine!' }
+  };
+  /* Pesato: il turbo esce spesso perché è quello che funziona anche quando sei
+     solo in testa, e il fulmine di rado perché prende tutti in una volta. */
+  var PESI = ['turbo', 'turbo', 'turbo', 'cocco', 'cocco', 'cocco', 'api', 'api', 'fulmine'];
+  var bullets = [];
+
   var boxes = [];
   function buildBoxes() {
     boxes.length = 0;
@@ -438,7 +466,7 @@
         dist: g.z * SEG_LEN,
         x: g.x,
         spd: 0,
-        boost: 0, bcool: 0,
+        boost: 0, bcool: 0, hit: 0,
         wob: i * 1.7
       });
     }
@@ -456,6 +484,7 @@
          can be in. They are opponents, so they get the same road. */
       r.boost = Math.max(0, r.boost - dt);
       r.bcool = Math.max(0, r.bcool - dt);
+      r.hit = Math.max(0, r.hit - dt);
       if (r.bcool <= 0 && Math.abs(r.x) < 1) {
         for (var b = 0; b < boxes.length; b++) {
           var bd = wrapDelta(r.z, boxes[b].seg * SEG_LEN);
@@ -496,6 +525,12 @@
          does is keep five karts within sight, which is the difference between a
          race and a time trial. */
       if (gap > 0) top = Math.min(top, MAX_SPD * (r.boost > 0 ? BOOST_MUL : 1));
+
+      /* E se l'ho colpito, arranca — DOPO la banda di recupero, non prima.
+         Applicarlo prima l'avrebbe fatto rientrare fra le braccia della banda,
+         che avrebbe restituito quasi tutto quello che il colpo aveva tolto:
+         tirargli il cocco sarebbe stato uno spettacolo senza conseguenze. */
+      if (r.hit > 0) top *= 0.34;
       r.spd += G.clamp(top - r.spd, -BRAKE * dt, ACCEL * dt);
       r.spd = G.clamp(r.spd, 0, MAX_SPD * BOOST_MUL);
 
@@ -530,11 +565,95 @@
       d = wrapDelta(S.z, b.seg * SEG_LEN);
       if (d > -SEG_LEN * 1.5 && d < SEG_LEN * 1.5 && Math.abs(b.x - S.x) < 0.32) {
         b.cool = 6;
-        S.boost = Math.max(S.boost, 1.1);
         S.took++;
         G.sfx('coin');
-        G.fx.burst(W / 2, H - 210, { color: C.sun, count: 12, speed: 300, lift: 160, size: 14 });
+        /* Una cassa presa mentre ne hai gia una in mano non si spreca: diventa
+           spinta. Cosi la cassa e SEMPRE una buona notizia, che a tre anni e
+           l unica regola che serve sapere. */
+        var got = S.ammo ? 'turbo' : PESI[Math.floor(G.rnd(0, PESI.length)) % PESI.length];
+        if (got === 'turbo') {
+          S.boost = Math.max(S.boost, 1.1);
+        } else {
+          S.ammo = got;
+          S.armaFlash = 1.1;
+        }
+        G.fx.burst(W / 2, H - 210, { color: ARMI[got].col, count: 12, speed: 300, lift: 160, size: 14 });
       }
+    }
+  }
+
+  /* SPARARE. Un solo colpo, quello che hai in mano, e parte sempre in avanti —
+     non si mira, non si sceglie, non si tiene premuto. Il bersaglio interessante
+     e sempre davanti, perche chi e dietro non ti da fastidio. */
+  function shoot() {
+    if (!S.ammo) return;
+    var kind = S.ammo;
+    S.ammo = null;
+
+    if (kind === 'fulmine') {
+      /* Nessun proiettile: prende in una volta tutti quelli davanti a te. E
+         l arma dei disperati, quella che ti rimette in gioco quando sei ultimo,
+         ed e apposta la piu rara. */
+      var i, colpiti = 0;
+      for (i = 0; i < rivals.length; i++) {
+        if (rivals[i].dist > S.dist) { rivals[i].hit = Math.max(rivals[i].hit, 1.6); colpiti++; }
+      }
+      S.flash = 0.45;
+      G.sfx(colpiti ? 'win' : 'bad');
+      G.fx.text(W / 2, 300, colpiti ? 'FULMINE!' : 'sei in testa!', C.sun, 56);
+      return;
+    }
+
+    bullets.push({
+      kind: kind,
+      z: wrapZ(S.z + SEG_LEN * 0.5),
+      x: S.x,
+      // le api inseguono chi ho davanti, il cocco vola dritto e lo devi mirare
+      target: kind === 'api' ? nearestAhead() : -1,
+      spd: MAX_SPD * (kind === 'api' ? 1.45 : 1.9),
+      life: 4.5,
+      wob: 0
+    });
+    G.sfx('whoosh');
+    G.say(ARMI[kind].dice);
+  }
+
+  function nearestAhead() {
+    var i, best = -1, bd = 1e9, d;
+    for (i = 0; i < rivals.length; i++) {
+      d = wrapDelta(S.z, rivals[i].z);
+      if (d > 0 && d < bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+
+  function updateBullets(dt) {
+    var i, j, b, r, d, tx;
+    for (i = bullets.length - 1; i >= 0; i--) {
+      b = bullets[i];
+      b.life -= dt;
+      b.wob += dt;
+      b.z = wrapZ(b.z + b.spd * dt);
+
+      if (b.target >= 0 && rivals[b.target]) {
+        // le api curvano verso il bersaglio invece di sperare
+        tx = rivals[b.target].x;
+        b.x += G.clamp(tx - b.x, -dt * 2.2, dt * 2.2);
+      }
+
+      var colpito = false;
+      for (j = 0; j < rivals.length; j++) {
+        r = rivals[j];
+        d = wrapDelta(b.z, r.z);
+        if (d > -SEG_LEN * 1.3 && d < SEG_LEN * 1.3 && Math.abs(b.x - r.x) < 0.34) {
+          r.hit = Math.max(r.hit, 2.0);
+          colpito = true;
+          G.sfx('hatch');
+          G.fx.text(W / 2, 330, 'PRESO!', C.sun, 60);
+          break;
+        }
+      }
+      if (colpito || b.life <= 0) bullets.splice(i, 1);
     }
   }
 
@@ -582,6 +701,9 @@
       lapT: S.lapT, best: S.lapShown, trackLen: trackLen,
       steerRate: STEER_RATE, centrif: CENTRIF, maxCurve: maxCurve(),
       drift: S.drift, boost: S.boost, took: S.took, boxes: boxes.length,
+      ammo: S.ammo, bullets: bullets.length, fireY: FIRE_Y,
+      hitSpd: (function () { for (var i = 0; i < rivals.length; i++) if (rivals[i].hit > 0) return rivals[i].spd; return -1; })(),
+      hits: rivals.reduce(function (a, r) { return a + (r.hit > 0 ? 1 : 0); }, 0),
       farX: S.farX,
       maxSpd: MAX_SPD, boostMul: BOOST_MUL, drift2: DRIFT_2
     };
@@ -616,6 +738,8 @@
       S.z = 0; S.x = 0; S.spd = 0; S.steer = 0; S.off = 0;
       S.leanShown = 0; S.boost = 0; S.dist = 0;
       S.drift = 0; S.took = 0;
+      S.ammo = null; S.armaFlash = 0; S.flash = 0;
+      bullets.length = 0;
       S.phase = 'via'; S.t = 0; S.lit = -1;
       S.lapT = 0; S.lapShown = 0; S.lap = 1; S.place = 1;
       S.order = null; S.newBest = false;
@@ -697,6 +821,9 @@
       }
 
       takeBoxes(dt);
+      updateBullets(dt);
+      S.armaFlash = Math.max(0, S.armaFlash - dt);
+      S.flash = Math.max(0, S.flash - dt);
       updateRivals(dt);
       S.dist += S.spd * dt;
       S.lapT += dt;
@@ -719,8 +846,22 @@
       if (S.dist >= S.laps * trackLen) finish();
     },
 
-    onDown: function (p) { if (S.phase === "gara") S.steer = p.x < W / 2 ? -1 : 1; },
-    onMove: function (p) { if (S.phase === "gara") S.steer = p.x < W / 2 ? -1 : 1; },
+    /* IL TASTO DI FUOCO NON PUO' RUBARE LO STERZO. Sterzare occupa gia tutte e
+       due le meta dello schermo, quindi un'arma avrebbe bisogno di un posto suo
+       — ma un bambino che tiene il tablet appoggia i pollici in basso, ed e' li
+       che va messo. Quindi la fascia in fondo diventa il tasto di fuoco SOLO
+       quando hai qualcosa in mano: a mani vuote sterza come tutto il resto, e
+       non esiste nessuna zona morta da imparare. */
+    onDown: function (p) {
+      if (S.phase !== 'gara') return;
+      if (S.ammo && p.y >= FIRE_Y) { shoot(); S.steer = 0; return; }
+      S.steer = p.x < W / 2 ? -1 : 1;
+    },
+    onMove: function (p) {
+      if (S.phase !== 'gara') return;
+      if (S.ammo && p.y >= FIRE_Y) return;     // il dito e' sul tasto: non sterzo
+      S.steer = p.x < W / 2 ? -1 : 1;
+    },
     onUp: function () { S.steer = 0; },
 
     draw: function (c) { drawAll(c); }
@@ -819,6 +960,7 @@
 
     drawProps(c);
     drawBoxes(c);
+    drawBullets(c);
     drawRivals(c);
     drawKart(c);
     drawRaceHud(c);
@@ -947,6 +1089,29 @@
     }
   }
 
+  /* I proiettili in volo, con la stessa identica regola di distanza dei kart:
+     e' l'unico modo perche' un cocco a mezza pista non venga grande come una
+     casa. Disegnati prima degli avversari, cosi' quando il colpo arriva sparisce
+     DIETRO il kart che sta colpendo invece che davanti. */
+  function drawBullets(c) {
+    var i, j, b, sh, di, dd, sz, x, y;
+    for (i = shots.length - 1; i >= 0; i--) {
+      sh = shots[i];
+      if (i < 3) continue;
+      for (j = 0; j < bullets.length; j++) {
+        b = bullets[j];
+        di = Math.round(wrapDelta(S.z, b.z) / SEG_LEN);
+        if (di !== i || di < 1) continue;
+        dd = di * SEG_LEN;
+        sz = (CAM_D / (CAM_BACK + dd)) * 260 * W / 2;
+        if (sz < 4) continue;
+        x = sh.x + sh.w * b.x;
+        y = sh.y - sz * 0.7 - Math.abs(Math.sin(b.wob * 9)) * sz * 0.35;
+        if (A.arma) A.arma(c, x, y, sz, b.kind, b.wob);
+      }
+    }
+  }
+
   /* Rivals, painted from the back of the draw list forwards so a nearer kart
      covers a farther one, and so a hill hides whoever is behind it — the same
      ordering the road itself uses. Their size comes from the segment they stand
@@ -972,8 +1137,8 @@
         x = sh.x + sh.w * r.x;
         A.kartBack(c, x, sh.y, sz, {
           color: r.color,
-          lean: G.clamp(segAt(r.z).curve * 0.12, -1, 1),
-          bob: 0,
+          lean: r.hit > 0 ? Math.sin(G.t * 22 + j) * 0.95 : G.clamp(segAt(r.z).curve * 0.12, -1, 1),
+          bob: r.hit > 0 ? Math.sin(G.t * 30 + j) * 3 : 0,
           boost: r.boost > 0 ? Math.min(0.85, r.boost) : 0
         });
       }
@@ -1032,9 +1197,54 @@
     c.restore();
   }
 
+  /* IL TASTO DI FUOCO ESISTE SOLO QUANDO SERVE. Compare in fondo allo schermo
+     nel momento in cui prendi qualcosa, largo quanto tutto lo schermo, con
+     dentro la cosa che stai per tirare, e sparisce appena l'hai tirata. Non c'e
+     niente da imparare a memoria: c'e un tasto, o non c'e. */
+  function drawFireBar(c) {
+    if (!S.ammo) return;
+    var a = ARMI[S.ammo];
+    var pulse = 0.72 + 0.28 * Math.sin(G.t * 6);
+    var bh = H - FIRE_Y;
+    c.save();
+    var g = c.createLinearGradient(0, FIRE_Y, 0, H);
+    g.addColorStop(0, 'rgba(14,20,34,0)');
+    g.addColorStop(1, 'rgba(14,20,34,.34)');
+    c.fillStyle = g; c.fillRect(0, FIRE_Y, W, bh);
+    c.globalAlpha = pulse;
+    c.strokeStyle = a.col; c.lineWidth = 5;
+    G.roundRect(c, 16, FIRE_Y + 10, W - 32, bh - 22, 26); c.stroke();
+    c.restore();
+
+    // l'oggetto due volte, ai lati del kart, cosi cade sotto tutte e due le mani
+    if (A.arma) {
+      A.arma(c, 150, FIRE_Y + bh * 0.5, 66, S.ammo, G.t);
+      A.arma(c, W - 150, FIRE_Y + bh * 0.5, 66, S.ammo, G.t);
+    }
+    G.text('TIRA!', W / 2, FIRE_Y + bh * 0.5, {
+      ctx: c, size: 38, color: a.col, stroke: 'rgba(12,20,34,.85)', strokeWidth: 10
+    });
+
+    if (S.armaFlash > 0) {
+      c.save();
+      c.globalAlpha = Math.min(1, S.armaFlash * 1.4);
+      G.text(a.nome, W / 2, 250, {
+        ctx: c, size: 76, color: a.col, stroke: 'rgba(12,20,34,.85)', strokeWidth: 14
+      });
+      c.restore();
+    }
+  }
+
   function drawRaceHud(c) {
     if (S.phase === 'fine') return;
     drawMap(c);
+    drawFireBar(c);
+    if (S.flash > 0) {
+      c.save();
+      c.globalAlpha = Math.min(0.75, S.flash * 1.7);
+      c.fillStyle = '#dff4ff'; c.fillRect(0, 0, W, H);
+      c.restore();
+    }
     A.pill(c, 500, 104, 130, 74, 'GIRO', S.lap + '/' + S.laps);
     A.pill(c, 646, 104, 130, 74, 'POSTO', S.place + '/' + (rivals.length + 1),
       S.place === 1 ? '#7ee787' : (S.place > 4 ? '#ff8f8f' : null));
