@@ -53,19 +53,38 @@
       id: 'collina',
       name: 'La Collina',
       sky: ['#7fc6e8', '#cfeafc'],
+      /* A LAP IS TWENTY SECONDS. The first version of this plan came to 580
+         segments, which at full speed is a lap every ten — so an easy race was
+         over in nineteen seconds, before a child had finished working out which
+         side of the screen turns which way. Length is the cheapest thing in a
+         segment renderer: the ribbon costs the same to draw whether the loop is
+         short or long, only the list is bigger. */
       plan: [
-        ['dritto', 60, 0, 0],
+        ['rettilineo di partenza', 70, 0, 0],
         ['curva dolce dx', 50, 2.2, 0],
         ['salita', 40, 0, 22],
         ['curva secca sx', 45, -4.4, 0],
         ['discesa', 40, 0, -22],
         ['dritto', 35, 0, 0],
-        ['curva dx', 55, 3.4, 14],
+        ['curva dx in salita', 55, 3.4, 14],
         ['esse sx', 40, -3.0, 0],
         ['esse dx', 40, 3.0, 0],
         ['dritto lungo', 70, 0, 0],
         ['curva sx larga', 60, -2.0, -10],
-        ['dritto', 45, 0, 0]
+        ['respiro', 45, 0, 0],
+        ['tornantino dx', 46, 4.6, 0],
+        ['discesa dritta', 50, 0, -18],
+        ['curva sx dolce', 55, -2.4, 0],
+        ['dosso', 30, 0, 26],
+        ['contro-dosso', 30, 0, -26],
+        ['dritto', 40, 0, 0],
+        ['esse dx stretta', 34, 3.8, 0],
+        ['esse sx stretta', 34, -3.8, 0],
+        ['curva dx lunga', 65, 2.6, 12],
+        ['dritto in cima', 40, 0, 0],
+        ['tornantino sx', 46, -4.6, -14],
+        ['curva dx dolce', 50, 2.0, 0],
+        ['rettilineo finale', 80, 0, 0]
       ]
     }
   ];
@@ -132,8 +151,9 @@
     phase: 'via',    // 'via' = countdown | 'gara' | 'fine'
     t: 0,            // seconds in the current phase
     lapT: 0, best: 0, lapShown: 0,
-    place: 1, laps: 3,
-    order: []
+    place: 1, laps: 3, lap: 1, lit: -1, newBest: false,
+    rivalScale: 1,
+    order: null
   };
 
   var MAX_SPD = 12000;           // world units per second
@@ -208,7 +228,7 @@
     for (i = 0; i < rivals.length; i++) {
       r = rivals[i];
       here = segAt(r.z);
-      top = MAX_SPD * r.skill * (Math.abs(r.x) < 1 ? 1 : 0.38);
+      top = MAX_SPD * r.skill * (S.rivalScale || 1) * (Math.abs(r.x) < 1 ? 1 : 0.38);
       r.spd += G.clamp(top - r.spd, -BRAKE * dt, ACCEL * dt);
       r.spd = G.clamp(r.spd, 0, MAX_SPD * 1.05);
 
@@ -254,22 +274,66 @@
   /* Read-only window on the driving state, so the headless test can assert that
      steering actually moves the kart. Nothing in the game reads it. */
   G.kartState = function () {
-    return { x: S.x, spd: S.spd, z: S.z, steer: S.steer, off: S.off, dist: S.dist };
+    return {
+      x: S.x, spd: S.spd, z: S.z, steer: S.steer, off: S.off, dist: S.dist,
+      phase: S.phase, lap: S.lap, laps: S.laps, place: S.place,
+      field: rivals.length + 1, order: S.order ? S.order.length : 0,
+      lapT: S.lapT, best: S.lapShown, trackLen: trackLen,
+      steerRate: STEER_RATE, centrif: CENTRIF, maxCurve: maxCurve()
+    };
   };
+
+  /* The sharpest bend on the loaded track. The test compares it against the
+     steering to prove the road can be held at all — the bug that made the game
+     unplayable was a corner pushing outwards harder than full lock pulled in,
+     and no amount of driving skill answers that. */
+  function maxCurve() {
+    var i, m = 0;
+    for (i = 0; i < segs.length; i++) if (Math.abs(segs[i].curve) > m) m = Math.abs(segs[i].curve);
+    return m;
+  }
 
   /* ================================================================ SCENE */
   G.scene('pista', {
     hud: true, back: true,
 
     enter: function () {
+      var g = G.kartSave ? G.kartSave() : { track: 0 };
+      var d = G.kartDiff ? G.kartDiff() : { laps: 3, rivalScale: 1 };
+      S.track = Math.min(TRACKS.length - 1, g.track || 0);
+      S.laps = d.laps;
+      S.rivalScale = d.rivalScale;
+
       buildTrack(TRACKS[S.track]);
       buildProps();
       buildRivals();
       S.z = 0; S.x = 0; S.spd = 0; S.steer = 0; S.off = 0;
       S.leanShown = 0; S.boost = 0; S.dist = 0;
+      S.phase = 'via'; S.t = 0; S.lit = -1;
+      S.lapT = 0; S.lapShown = 0; S.lap = 1; S.place = 1;
+      S.order = null; S.newBest = false;
     },
 
     update: function (dt) {
+      S.t += dt;
+
+      /* THE COUNTDOWN, and it is not decoration. Without it you were dropped
+         into a race already moving, which is the single thing that made this
+         read as a demo rather than a game: there was no moment at which it
+         began. */
+      if (S.phase === 'via') {
+        var lit = Math.min(3, Math.floor(S.t));
+        if (lit !== S.lit) {
+          S.lit = lit;
+          if (lit >= 3) { G.sfx('win'); G.say('Via!'); }
+          else if (lit >= 0) G.sfx('pop');
+        }
+        if (S.t >= 3.3) { S.phase = 'gara'; S.t = 0; }
+        S.spd = 0;
+        return;
+      }
+      if (S.phase === 'fine') return;
+
       var here = segAt(S.z);
       var onRoad = Math.abs(S.x) < 1;
 
@@ -309,14 +373,75 @@
 
       updateRivals(dt);
       S.dist += S.spd * dt;
+      S.lapT += dt;
+
+      /* A lap is a distance, not a line you have to be told you crossed. */
+      var lapNow = Math.floor(S.dist / trackLen) + 1;
+      if (lapNow > S.lap) {
+        /* Clamped, or the last crossing reads "GIRO 3/2" for the frame between
+           the line and the finish. The lap still closes: the time is banked. */
+        S.lap = Math.min(lapNow, S.laps);
+        closeLap();
+      }
+
+      /* Position: who has covered more ground. No fudging, no hidden ordering —
+         if a rival is ahead of you it is because it drove further. */
+      var ahead = 0, i;
+      for (i = 0; i < rivals.length; i++) if (rivals[i].dist > S.dist) ahead++;
+      S.place = ahead + 1;
+
+      if (S.dist >= S.laps * trackLen) finish();
     },
 
-    onDown: function (p) { S.steer = p.x < W / 2 ? -1 : 1; },
-    onMove: function (p) { S.steer = p.x < W / 2 ? -1 : 1; },
+    onDown: function (p) { if (S.phase === "gara") S.steer = p.x < W / 2 ? -1 : 1; },
+    onMove: function (p) { if (S.phase === "gara") S.steer = p.x < W / 2 ? -1 : 1; },
     onUp: function () { S.steer = 0; },
 
     draw: function (c) { drawAll(c); }
   });
+
+  /* ------------------------------------------------------------ lap & end */
+  function closeLap() {
+    var g = G.kartSave ? G.kartSave() : null;
+    var id = TRACKS[S.track].id;
+    S.lapShown = S.lapT;
+    if (g && (!g.best[id] || S.lapT < g.best[id])) {
+      g.best[id] = S.lapT;
+      S.newBest = true;
+      G.saveNow();
+    }
+    S.lapT = 0;
+    G.sfx('chime');
+  }
+
+  function finish() {
+    var g = G.kartSave ? G.kartSave() : null, i;
+    S.phase = 'fine'; S.t = 0;
+    /* Everyone's placing, worked out once and frozen, so the results screen
+       cannot quietly reshuffle while you read it. */
+    var all = [{ me: true, name: 'Tu', color: (G.account && G.account.color) || C.dino, dist: S.dist }];
+    for (i = 0; i < rivals.length; i++) {
+      all.push({ me: false, name: rivals[i].name, color: rivals[i].color, dist: rivals[i].dist });
+    }
+    all.sort(function (a, b) { return b.dist - a.dist; });
+    S.order = all;
+    for (i = 0; i < all.length; i++) if (all[i].me) S.place = i + 1;
+
+    if (g) {
+      g.races++;
+      if (S.place === 1) g.wins++;
+      G.saveNow();
+    }
+    G.sfx(S.place === 1 ? 'win' : 'chime');
+    if (S.place === 1) G.fx.confetti();
+    G.say(S.place === 1 ? 'Hai vinto!' : 'Sei arrivato ' + S.place + 'esimo!');
+  }
+
+  function fmtT(t) {
+    if (!t || !isFinite(t)) return '--';
+    var m = Math.floor(t / 60), s = t - m * 60;
+    return (m > 0 ? m + "'" : '') + (s < 10 && m > 0 ? '0' : '') + s.toFixed(2) + '"';
+  }
 
   /* ----------------------------------------------------------------- draw */
   function drawAll(c) {
@@ -362,6 +487,9 @@
     drawProps(c);
     drawRivals(c);
     drawKart(c);
+    drawRaceHud(c);
+    if (S.phase === "via") drawLights(c);
+    if (S.phase === "fine") drawResults(c);
     void drawn;
   }
 
@@ -459,6 +587,89 @@
         });
       }
     }
+  }
+
+  /* Four readouts, and no more: which lap, what place, this lap's time, and how
+     fast. A racing HUD that says more than that is a dashboard, and a six-year
+     old reads none of it. */
+  function drawRaceHud(c) {
+    if (S.phase === 'fine') return;
+    A.pill(c, 500, 104, 130, 74, 'GIRO', S.lap + '/' + S.laps);
+    A.pill(c, 646, 104, 130, 74, 'POSTO', S.place + '/' + (rivals.length + 1),
+      S.place === 1 ? '#7ee787' : (S.place > 4 ? '#ff8f8f' : null));
+    A.pill(c, 792, 104, 190, 74, 'TEMPO', fmtT(S.lapT));
+    var kmh = Math.round(S.spd / MAX_SPD * 120);
+    A.pill(c, 1090, H - 104, 150, 74, null, kmh, S.off > 0.4 ? '#ff8f8f' : null);
+
+    if (S.lapShown > 0 && S.t < 3.2 && S.lap > 1) {
+      G.text((S.newBest ? 'GIRO RECORD  ' : 'giro  ') + fmtT(S.lapShown), W / 2, 232, {
+        ctx: c, size: 40, color: S.newBest ? C.sun : '#e8eef7',
+        stroke: 'rgba(12,20,34,.8)', strokeWidth: 9
+      });
+    }
+  }
+
+  /* Three lights and a word. The moment the race begins has to exist. */
+  function drawLights(c) {
+    var i, on;
+    for (i = 0; i < 3; i++) {
+      on = S.lit > i;
+      c.save();
+      c.fillStyle = on ? (i === 2 ? '#7ee787' : C.sun) : 'rgba(255,246,224,.22)';
+      c.beginPath(); c.arc(W / 2 - 110 + i * 110, 250, 40, 0, 6.2832); c.fill();
+      c.strokeStyle = 'rgba(14,20,34,.7)'; c.lineWidth = 6; c.stroke();
+      c.restore();
+    }
+    G.text(S.lit >= 3 ? 'VIA!' : 'Pronti...', W / 2, 358, {
+      ctx: c, size: S.lit >= 3 ? 74 : 52, color: S.lit >= 3 ? '#7ee787' : '#fff6e0',
+      stroke: 'rgba(12,20,34,.8)', strokeWidth: 12
+    });
+  }
+
+  /* The end of the race, which the game did not have at all: the full order,
+     your place, and the two things you can do next. */
+  function drawResults(c) {
+    var i, o, y;
+    c.save(); c.fillStyle = 'rgba(9,16,30,.72)'; c.fillRect(0, 0, W, H); c.restore();
+
+    G.text(S.place === 1 ? 'HAI VINTO!' : S.place + 'º POSTO', W / 2, 96, {
+      ctx: c, size: 66, color: S.place === 1 ? C.sun : '#e8eef7',
+      stroke: 'rgba(12,20,34,.8)', strokeWidth: 12
+    });
+
+    for (i = 0; i < (S.order || []).length; i++) {
+      o = S.order[i];
+      y = 156 + i * 66;
+      c.save();
+      c.fillStyle = o.me ? 'rgba(255,215,94,.20)' : 'rgba(255,246,224,.08)';
+      G.roundRect(c, 400, y, 480, 56, 14); c.fill();
+      c.restore();
+      G.text(String(i + 1), 436, y + 30, { ctx: c, size: 30, color: '#e8eef7' });
+      c.save();
+      c.fillStyle = o.color;
+      c.beginPath(); c.arc(486, y + 28, 17, 0, 6.2832); c.fill();
+      c.strokeStyle = 'rgba(12,20,34,.7)'; c.lineWidth = 3; c.stroke();
+      c.restore();
+      G.text(o.name, 530, y + 30, {
+        ctx: c, size: 30, color: o.me ? C.sun : '#e8eef7', align: 'left'
+      });
+    }
+
+    var g = G.kartSave ? G.kartSave() : null;
+    if (g) {
+      G.text('giro migliore ' + fmtT(g.best[TRACKS[S.track].id]), W / 2, 156 + 6 * 66 + 6, {
+        ctx: c, size: 26, color: 'rgba(255,246,224,.75)', weight: 800
+      });
+    }
+
+    G.ui.button({
+      id: 'kagain', x: 330, y: H - 116, w: 280, h: 92, r: 26, color: C.leaf,
+      label: 'Ancora!', fontSize: 36, onTap: function () { G.go('pista'); }
+    });
+    G.ui.button({
+      id: 'kmenu', x: 670, y: H - 116, w: 280, h: 92, r: 26, color: C.tangerine,
+      label: 'Menu', fontSize: 36, onTap: function () { G.go('menu'); }
+    });
   }
 
   function quad(c, x1, y1, w1, x2, y2, w2, col) {

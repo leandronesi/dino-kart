@@ -169,5 +169,24 @@
     c.restore();
   };
 
+  /* A pill of text on a dark slab. Everything the race HUD says goes through
+     this, so the four readouts cannot drift apart in style. */
+  A.pill = function (c, x, y, w, h, label, value, col) {
+    c.save();
+    c.fillStyle = 'rgba(14,20,34,.66)';
+    G.roundRect(c, x, y, w, h, h * 0.28); c.fill();
+    c.strokeStyle = 'rgba(255,246,224,.22)'; c.lineWidth = 2;
+    G.roundRect(c, x, y, w, h, h * 0.28); c.stroke();
+    c.restore();
+    if (label) {
+      G.text(label, x + w / 2, y + h * 0.30, {
+        ctx: c, size: h * 0.24, color: 'rgba(255,246,224,.7)', weight: 800
+      });
+    }
+    G.text(String(value), x + w / 2, y + h * (label ? 0.70 : 0.52), {
+      ctx: c, size: h * (label ? 0.42 : 0.56), color: col || (C.sun || '#ffd75e')
+    });
+  };
+
   A._kart_ok = true;
 })();

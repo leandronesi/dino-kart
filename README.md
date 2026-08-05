@@ -36,7 +36,29 @@ geometria 3D da nessuna parte:
 ## Comandi
 
 Tocchi la **metà destra** dello schermo e sterzi a destra, la **metà sinistra**
-e sterzi a sinistra. Niente altro da imparare.
+e sterzi a sinistra. Niente altro da imparare. Il gas va da solo: chi deve
+sterzare *e* tenere premuto un acceleratore ha due lavori, e quello che conta è
+lo sterzo.
+
+## La gara
+
+Per un po' questo è stato solo un simulatore di strada: aprivi e ti trovavi già
+in corsa, senza un momento in cui cominciava e senza uno in cui finiva. Adesso
+c'è la cornice, ed è quella che lo rende un gioco.
+
+- **Menu**: scegli la pista e la difficoltà, poi **VIA!**
+  - *Facile* — 2 giri, avversari all'86%
+  - *Corsa* — 3 giri, avversari al 100%
+- **Semaforo**: tre luci, e finché sono accese il kart sta fermo.
+- **Durante**: giro, posizione, tempo sul giro e velocità. Quattro numeri, non uno
+  di più — un cruscotto un bambino di sei anni non lo legge.
+- **Arrivo**: l'ordine completo dei sei kart, il tuo posto, il giro migliore
+  salvato per pista, e due tasti: *Ancora!* e *Menu*.
+
+Un giro dura una ventina di secondi, una gara fra i 40 e i 60. La posizione è
+vera: conta la strada percorsa, niente aggiustamenti nascosti. Nessun avversario
+è più veloce di te a tavoletta — guidando bene si vince, guidando male si perde,
+e passando un quarto di gara sull'erba si arriva ultimi.
 
 ## Com'è organizzato
 
@@ -46,9 +68,11 @@ Pages via Actions — con le scene buttate e le chiavi di `localStorage` cambiat
 da `dg.` a `dk.`, così i due giochi non si pestano i piedi sullo stesso tablet.
 
 ```
-src/00-core.js   il motore (invariato rispetto a Dino Giungla)
-src/10-pista.js  la strada pseudo-3D, la guida, il kart
-src/99-boot.js   avvio: profilo silenzioso e via in pista
+src/00-core.js       il motore (invariato rispetto a Dino Giungla)
+src/01-art-kart.js   il kart visto di spalle — una sola angolazione, più il lean
+src/05-menu.js       pista, difficoltà, VIA
+src/10-pista.js      la strada pseudo-3D, la guida, gli avversari, la gara
+src/99-boot.js       avvio: profilo silenzioso e via al menu
 ```
 
 ```bash

@@ -259,7 +259,7 @@ phase = "avvio";
 pump(20);
 if (!G.current) fail("nessuna scena attiva dopo l avvio");
 
-const expected = ["pista"];
+const expected = ["menu", "pista"];
 const missing = expected.filter((s2) => !G.sceneOf(s2));
 if (missing.length) fail("scene mancanti: " + missing.join(", "));
 if (!G.account) fail("il boot non ha creato un profilo");
@@ -269,6 +269,7 @@ phase = "pista";
 if (G.sceneOf("pista")) {
   G.go("pista"); pump(40);
   if (G.current !== "pista") fail("non sono entrato in pista (sono in \"" + G.current + "\")");
+  pump(200);                                   // oltre il semaforo: qui si prova la guida
   drawCount = 0;
   pump(60);
   if (drawCount < 2000) fail("la strada disegna quasi nulla: " + drawCount + " operazioni in 60 frame");
@@ -306,6 +307,97 @@ if (G.sceneOf("pista")) {
   const xa = G.kartState().x; pump(60);
   const xb = G.kartState().x;
   if (Math.abs(xb - xa) > 0.35) fail("lo sterzo resta incastrato dopo il rilascio: x " + xa.toFixed(3) + " -> " + xb.toFixed(3));
+}
+
+/* LA GARA HA UN INIZIO E UNA FINE. Questo blocco esiste perche il gioco per
+   settimane e stato una prova su strada: entravi ed eri gia in corsa, senza
+   semaforo, senza giri contati, senza arrivo. Un test che guarda solo se la
+   strada si disegna non se ne accorge. Qui si guida davvero un intero Gran
+   Premio, dal menu al podio. */
+phase = "gara";
+if (G.sceneOf("menu") && G.sceneOf("pista")) {
+  G.go("menu"); pump(30);
+  const g = G.kartSave();
+  g.diff = 0;                                  // Facile: 2 giri, e il test dura meno
+  const races0 = g.races;
+
+  tap(640, 559);                               // VIA!
+  pump(30);
+  if (G.current !== "pista") fail("il tasto VIA non porta in pista (sono in \"" + G.current + "\")");
+
+  let st = G.kartState();
+  if (st.phase !== "via") fail("la gara non parte dal semaforo: fase \"" + st.phase + "\"");
+  if (st.laps !== 2) fail("Facile non da 2 giri ma " + st.laps);
+  pump(60);
+  if (G.kartState().spd !== 0) fail("il kart si muove durante il conto alla rovescia");
+
+  pump(180);                                   // ~4s: il semaforo dura 3,3
+  if (G.kartState().phase !== "gara") fail("il semaforo non finisce mai: fase \"" + G.kartState().phase + "\"");
+
+  /* LA CURVA NON PUO ESSERE PIU FORTE DELLO STERZO. Detto in numeri, perche
+     detto in comportamento e sfuggito una volta gia: alla curva piu stretta la
+     spinta verso l esterno deve restare ben sotto il volante a fondo corsa. Con
+     0,55 di centrifuga era 2,5 contro 1: la strada era letteralmente
+     intenibile, e nessuna bravura rispondeva a questo. */
+  const push = st.maxCurve * st.centrif;
+  if (push > st.steerRate * 0.7) {
+    fail("la curva piu stretta spinge " + push.toFixed(2) + " contro uno sterzo di " + st.steerRate.toFixed(2));
+  }
+
+  // pilota automatico: correggo quando sono a un terzo dal bordo, come farebbe
+  // un bambino — non con micro-correzioni continue che nasconderebbero il difetto
+  let holding = 0;
+  function steerTo(dir) {
+    if (dir === 0) { if (holding) { ELS.c.dispatch("pointerup", pev(640, 500)); holding = 0; } return; }
+    const px = dir > 0 ? 1080 : 200;
+    if (!holding) { ELS.c.dispatch("pointerdown", pev(px, 500)); holding = dir; }
+    else if (holding !== dir) { ELS.c.dispatch("pointermove", pev(px, 500)); holding = dir; }
+  }
+
+  let offFrames = 0, ran = 0, maxLap = 1, badPlace = 0;
+  for (ran = 0; ran < 14000; ran++) {
+    st = G.kartState();
+    if (st.phase === "fine") break;
+    if (st.x > 0.34) steerTo(-1); else if (st.x < -0.34) steerTo(1); else steerTo(0);
+    if (Math.abs(st.x) >= 1) offFrames++;
+    if (st.lap > maxLap) maxLap = st.lap;
+    if (!(st.place >= 1 && st.place <= st.field)) badPlace++;
+    pump(1);
+  }
+  steerTo(0);
+
+  st = G.kartState();
+  if (st.phase !== "fine") fail("la gara non finisce mai: " + ran + " frame, giro " + st.lap + "/" + st.laps);
+  if (maxLap < 2) fail("il contagiri non avanza: mai oltre il giro " + maxLap);
+  if (badPlace) fail("posizione fuori dal gruppo in " + badPlace + " frame");
+  if (st.order !== 6) fail("l ordine d arrivo non ha 6 kart ma " + st.order);
+  if (!(st.place >= 1 && st.place <= 6)) fail("posizione finale assurda: " + st.place);
+
+  /* LA STRADA DEVE ESSERE TENIBILE. Il bug che ha reso il gioco ingiocabile
+     era una forza centrifuga piu forte dello sterzo: con quella, correggendo
+     sempre si finiva lo stesso sull erba. Un pilota che corregge deve stare
+     dentro. */
+  if (offFrames > ran * 0.25) {
+    fail("la pista non e tenibile: fuori strada per " + Math.round(offFrames / ran * 100) + "% della gara");
+  }
+
+  // un giro deve durare quanto una gara di kart, non quanto uno starnuto
+  const lapSecs = ran * 0.0167 / 2;
+  if (lapSecs < 12) fail("il giro dura solo " + lapSecs.toFixed(1) + "s: la pista e troppo corta");
+
+  const g2 = G.kartSave();
+  if (g2.races !== races0 + 1) fail("la gara finita non e stata contata");
+  if (!isFinite(g2.best.collina) || g2.best.collina <= 0) fail("nessun tempo sul giro salvato");
+
+  // e dal podio si riparte
+  drawCount = 0; pump(2);
+  if (drawCount < 200) fail("la schermata d arrivo non disegna nulla");
+  tap(470, 720 - 70);                          // Ancora!
+  pump(30);
+  if (G.current !== "pista" || G.kartState().phase !== "via") {
+    fail("\"Ancora!\" non fa ripartire una gara nuova");
+  }
+  G.go("menu"); pump(30);
 }
 
 phase = "salvataggio";
