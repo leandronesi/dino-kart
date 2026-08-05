@@ -1286,33 +1286,36 @@ html, body {
          over in nineteen seconds, before a child had finished working out which
          side of the screen turns which way. Length is the cheapest thing in a
          segment renderer: the ribbon costs the same to draw whether the loop is
-         short or long, only the list is bigger. */
+         short or long, only the list is bigger.
+
+         LONG CORNERS, NOT SHARP ONES, and this is the difference between a
+         track and a corridor. Simulating a driver who never touches the screen
+         showed the second version of this plan was a corridor: he finished
+         first, on the tarmac the whole way, having done nothing — the exact
+         complaint that got Il Girotondo demoted to a roundabout. Short bends
+         that alternate cancel each other out before they can push you anywhere.
+         What pushes you into the grass is a bend that goes ON: a moderate curve
+         held for two and a half seconds drifts you a whole road-width, while
+         full lock still out-pulls it instantly, so it is demanding without ever
+         being unholdable. Nothing here exceeds a curve of 3.0 for that reason. */
       plan: [
-        ['rettilineo di partenza', 70, 0, 0],
-        ['curva dolce dx', 50, 2.2, 0],
-        ['salita', 40, 0, 22],
-        ['curva secca sx', 45, -4.4, 0],
-        ['discesa', 40, 0, -22],
-        ['dritto', 35, 0, 0],
-        ['curva dx in salita', 55, 3.4, 14],
-        ['esse sx', 40, -3.0, 0],
-        ['esse dx', 40, 3.0, 0],
-        ['dritto lungo', 70, 0, 0],
-        ['curva sx larga', 60, -2.0, -10],
-        ['respiro', 45, 0, 0],
-        ['tornantino dx', 46, 4.6, 0],
-        ['discesa dritta', 50, 0, -18],
-        ['curva sx dolce', 55, -2.4, 0],
-        ['dosso', 30, 0, 26],
-        ['contro-dosso', 30, 0, -26],
+        ['rettilineo di partenza', 90, 0, 0],
+        ['curvone dx', 150, 2.6, 0],
+        ['respiro', 50, 0, 0],
+        ['salita', 40, 0, 20],
+        ['curvone sx interminabile', 170, -2.4, 0],
+        ['discesa', 40, 0, -20],
+        ['dritto', 50, 0, 0],
+        ['esse dx', 60, 2.8, 0],
+        ['esse sx', 60, -2.8, 0],
         ['dritto', 40, 0, 0],
-        ['esse dx stretta', 34, 3.8, 0],
-        ['esse sx stretta', 34, -3.8, 0],
-        ['curva dx lunga', 65, 2.6, 12],
-        ['dritto in cima', 40, 0, 0],
-        ['tornantino sx', 46, -4.6, -14],
-        ['curva dx dolce', 50, 2.0, 0],
-        ['rettilineo finale', 80, 0, 0]
+        ['curvone dx in salita', 150, 2.2, 12],
+        ['dosso', 30, 0, 24],
+        ['contro-dosso', 30, 0, -24],
+        ['curvone sx in discesa', 140, -2.6, -12],
+        ['dritto', 50, 0, 0],
+        ['ultima curva dx', 90, 3.0, 0],
+        ['rettilineo finale', 100, 0, 0]
       ]
     }
   ];
@@ -1381,6 +1384,8 @@ html, body {
     lapT: 0, best: 0, lapShown: 0,
     place: 1, laps: 3, lap: 1, lit: -1, newBest: false,
     rivalScale: 1,
+    drift: 0,        // seconds held at full lock in a bend
+    took: 0,         // boxes collected this race, for the results screen
     order: null
   };
 
@@ -1388,8 +1393,30 @@ html, body {
   var OFF_SPD = MAX_SPD * 0.38;  // top speed on the grass
   var ACCEL = MAX_SPD * 0.62;    // per second
   var BRAKE = MAX_SPD * 1.30;    // per second when off the road
-  var STEER_RATE = 1.0;          // road-widths per second at full lock, full speed
-  var CENTRIF = 0.125;           // outward push per unit of curve
+  /* THESE TWO NUMBERS ARE THE GAME, and they were found by simulation, not by
+     taste. Three drivers were raced on the real code: one who corrects early,
+     one who corrects only at the last moment, and one who NEVER TOUCHES THE
+     SCREEN. At 1.0 and 0.125 the passive one finished first, on the tarmac the
+     whole way, having done precisely nothing — which is not a racing game, it
+     is a screensaver, and it is the same fault that got Il Girotondo demoted.
+     At 1.35 and 0.30 he spends 39% of the race in the grass and finishes last,
+     while both drivers who steer stay clean and win. That is the gradient a
+     racing game needs: doing nothing has to cost you.
+     The ceiling on CENTRIF is the other half — see the assertion in the smoke
+     test. Full lock must out-pull the sharpest bend, or the road cannot be held
+     at all and no amount of skill answers that. */
+  var STEER_RATE = 1.35;         // road-widths per second at full lock, full speed
+  var CENTRIF = 0.30;            // outward push per unit of curve
+  var BOOST_MUL = 1.30;          // how much faster than flat out a boost makes you
+  /* SECONDS OF LOCK FOR THE SMALL AND BIG BOOST, and these two numbers are not
+     free. At full lock the kart crosses from one edge of the road to the other
+     in about two seconds, and the charge dies the moment a wheel touches grass.
+     So two seconds is the whole budget, and the big boost has to sit inside it:
+     the first pair I tried, 1.2 and 2.4, made the big one literally unreachable
+     — you were on the grass before it armed. Set up wide, hold through the
+     bend, let go: that is the six-year-old's extra game, and it has to be
+     possible. */
+  var DRIFT_1 = 0.7, DRIFT_2 = 1.5;
 
   /* Roadside objects. They do almost nothing mechanically and they are the whole
      reason a corner feels fast: with an empty verge, a road that scrolls at
@@ -1409,6 +1436,28 @@ html, body {
         kind: (i % 5 === 0) ? 'cartello' : 'albero',
         h: 900 + ((i * 53) % 7) * 130
       });
+    }
+  }
+
+  /* ----------------------------------------------------------- item boxes */
+  /* Three across the road, so grabbing one is nearly free — which is the point
+     at three years old. What is inside is always the same thing, a shove of
+     speed, and that is deliberate: an inventory needs a button, a button needs
+     a finger, and both fingers are already busy steering. The reward is
+     immediate and needs no explaining, which is the only kind that works here.
+
+     SPACING IS A BALANCE NUMBER, not a decoration. The first pass put a row
+     every 62 segments — one about every second at racing speed, against a boost
+     that lasts 1,1s. That is not a power-up, that is a permanent 30% pay rise:
+     the rivals top out at flat out and would never see you again. Every 120
+     segments means roughly one row every two seconds, so you are boosting about
+     half the time — and the rivals take them too, so the sums still add up. */
+  var boxes = [];
+  function buildBoxes() {
+    boxes.length = 0;
+    var i, k;
+    for (i = 80; i < segs.length - 30; i += 120) {
+      for (k = -1; k <= 1; k++) boxes.push({ seg: i, x: k * 0.55, cool: 0 });
     }
   }
 
@@ -1446,6 +1495,7 @@ html, body {
         dist: -(i + 1) * SEG_LEN * 2.2,
         x: (i % 2 ? 1 : -1) * (0.28 + (i * 0.14)),
         spd: 0,
+        boost: 0, bcool: 0,
         wob: i * 1.7
       });
     }
@@ -1456,9 +1506,26 @@ html, body {
     for (i = 0; i < rivals.length; i++) {
       r = rivals[i];
       here = segAt(r.z);
-      top = MAX_SPD * r.skill * (S.rivalScale || 1) * (Math.abs(r.x) < 1 ? 1 : 0.38);
+
+      /* THEY TAKE THE BOXES TOO. Without this the power-ups are not a mechanic,
+         they are a handicap handed to the player once a lap: a 30% boost half
+         the time against a field that tops out at flat out is a race nobody else
+         can be in. They are opponents, so they get the same road. */
+      r.boost = Math.max(0, r.boost - dt);
+      r.bcool = Math.max(0, r.bcool - dt);
+      if (r.bcool <= 0 && Math.abs(r.x) < 1) {
+        for (var b = 0; b < boxes.length; b++) {
+          var bd = wrapDelta(r.z, boxes[b].seg * SEG_LEN);
+          if (bd > -SEG_LEN * 1.5 && bd < SEG_LEN * 1.5 && Math.abs(boxes[b].x - r.x) < 0.32) {
+            r.boost = 1.1; r.bcool = 2.2; break;
+          }
+        }
+      }
+
+      top = MAX_SPD * r.skill * (S.rivalScale || 1)
+        * (Math.abs(r.x) < 1 ? 1 : 0.38) * (r.boost > 0 ? BOOST_MUL : 1);
       r.spd += G.clamp(top - r.spd, -BRAKE * dt, ACCEL * dt);
-      r.spd = G.clamp(r.spd, 0, MAX_SPD * 1.05);
+      r.spd = G.clamp(r.spd, 0, MAX_SPD * BOOST_MUL);
 
       /* Aim for the inside of the bend: on a right-hander the fast line is to
          the right. Wander a little so five karts are not one kart drawn five
@@ -1476,6 +1543,26 @@ html, body {
 
       r.z = wrapZ(r.z + r.spd * dt);
       r.dist += r.spd * dt;
+    }
+  }
+
+  /* Collecting is by DISTANCE, not by segment index, and that matters: flat out
+     a frame covers a whole segment, so "am I standing on the box's segment?"
+     would miss it about as often as it hit. A window three segments wide cannot
+     be jumped. */
+  function takeBoxes(dt) {
+    var i, b, d;
+    for (i = 0; i < boxes.length; i++) {
+      b = boxes[i];
+      if (b.cool > 0) { b.cool -= dt; continue; }
+      d = wrapDelta(S.z, b.seg * SEG_LEN);
+      if (d > -SEG_LEN * 1.5 && d < SEG_LEN * 1.5 && Math.abs(b.x - S.x) < 0.32) {
+        b.cool = 6;
+        S.boost = Math.max(S.boost, 1.1);
+        S.took++;
+        G.sfx('coin');
+        G.fx.burst(W / 2 + S.x * 64, H - 210, { color: C.sun, count: 12, speed: 300, lift: 160, size: 14 });
+      }
     }
   }
 
@@ -1507,7 +1594,9 @@ html, body {
       phase: S.phase, lap: S.lap, laps: S.laps, place: S.place,
       field: rivals.length + 1, order: S.order ? S.order.length : 0,
       lapT: S.lapT, best: S.lapShown, trackLen: trackLen,
-      steerRate: STEER_RATE, centrif: CENTRIF, maxCurve: maxCurve()
+      steerRate: STEER_RATE, centrif: CENTRIF, maxCurve: maxCurve(),
+      drift: S.drift, boost: S.boost, took: S.took, boxes: boxes.length,
+      maxSpd: MAX_SPD, boostMul: BOOST_MUL, drift2: DRIFT_2
     };
   };
 
@@ -1534,9 +1623,11 @@ html, body {
 
       buildTrack(TRACKS[S.track]);
       buildProps();
+      buildBoxes();
       buildRivals();
       S.z = 0; S.x = 0; S.spd = 0; S.steer = 0; S.off = 0;
       S.leanShown = 0; S.boost = 0; S.dist = 0;
+      S.drift = 0; S.took = 0;
       S.phase = 'via'; S.t = 0; S.lit = -1;
       S.lapT = 0; S.lapShown = 0; S.lap = 1; S.place = 1;
       S.order = null; S.newBest = false;
@@ -1570,26 +1661,30 @@ html, body {
          away is speed when you leave it, and that is the whole punishment
          model: no crash, no spin, no reset, just a slower kart and the pack
          pulling away. Losing here is a thing you watch happen, not a screen. */
-      var top = onRoad ? MAX_SPD : OFF_SPD;
-      if (S.spd < top) S.spd += ACCEL * dt;
+      /* A boost lifts the ceiling AND the pull towards it, or it reads as a
+         flame with nothing behind it. It does not rescue you from the grass:
+         off the road the ceiling is still the grass ceiling, just raised. */
+      var kick = S.boost > 0 ? BOOST_MUL : 1;
+      var top = (onRoad ? MAX_SPD : OFF_SPD) * kick;
+      if (S.spd < top) S.spd += ACCEL * (S.boost > 0 ? 2.4 : 1) * dt;
       else S.spd -= BRAKE * dt;
-      S.spd = G.clamp(S.spd, 0, MAX_SPD);
+      S.spd = G.clamp(S.spd, 0, MAX_SPD * BOOST_MUL);
       S.off = onRoad ? Math.max(0, S.off - dt * 3) : Math.min(1, S.off + dt * 3);
 
       S.z = wrapZ(S.z + S.spd * dt);
 
       /* Steering scales with speed: standing still you cannot turn, which is
          both true and what keeps the kart from pirouetting at the start line. */
-      var grip = S.spd / MAX_SPD;
-      /* Crossing from the middle of the road to its edge takes about a second at
-         full speed. It used to take half of one, which meant a single touch put
-         you on the grass before you saw anything move. */
+      var grip = Math.min(1, S.spd / MAX_SPD);
+      /* Crossing from the middle of the road to its edge takes about three
+         quarters of a second at full speed. An early version took half of one,
+         which meant a single touch put you on the grass before you saw anything
+         move. */
       S.x += S.steer * dt * STEER_RATE * grip;
       /* The outward push of the bend — the thing that makes a corner something
-         you fight rather than something you watch go by. */
-      /* The outward push must stay comfortably WEAKER than the steering, or a
-         bend is not a corner to fight, it is a wall. At the sharpest curve on
-         this track it is about half of full lock. */
+         you fight rather than something you watch go by. It must stay weaker
+         than full lock, or the bend is not a corner, it is a wall; but it must
+         be strong enough that a long bend carries you off if you ignore it. */
       S.x -= here.curve * dt * grip * CENTRIF;
       S.x = G.clamp(S.x, -2.4, 2.4);
 
@@ -1597,8 +1692,23 @@ html, body {
          cardboard cut-out being flicked; a tenth of a second of lag reads as
          weight. */
       S.leanShown += (S.steer * grip - S.leanShown) * Math.min(1, dt * 9);
-      S.boost = Math.max(0, S.boost - dt * 1.6);
+      S.boost = Math.max(0, S.boost - dt);
 
+      /* LA DERAPATA. Mario Kart's mini-turbo, and the reason it belongs in a
+         game aimed this young: charging it costs nothing a child was not doing
+         anyway. Holding your finger down through a bend IS how a three-year-old
+         steers — so they get the boost by accident, over and over, and it feels
+         like the kart rewarding them. The six-year-old will work out that the
+         long hold pays double, and that is her whole extra game. */
+      if (Math.abs(S.steer) > 0.9 && onRoad && S.spd > MAX_SPD * 0.55) {
+        S.drift += dt;
+      } else if (S.drift > 0) {
+        if (S.drift >= DRIFT_2) { S.boost = Math.max(S.boost, 1.4); G.sfx('win'); G.fx.ring(W / 2, H - 120, C.sun, 190); }
+        else if (S.drift >= DRIFT_1) { S.boost = Math.max(S.boost, 0.8); G.sfx('whoosh'); }
+        S.drift = 0;
+      }
+
+      takeBoxes(dt);
       updateRivals(dt);
       S.dist += S.spd * dt;
       S.lapT += dt;
@@ -1713,6 +1823,7 @@ html, body {
     }
 
     drawProps(c);
+    drawBoxes(c);
     drawRivals(c);
     drawKart(c);
     drawRaceHud(c);
@@ -1785,6 +1896,40 @@ html, body {
     }
   }
 
+  /* A floating leaf-cube, bobbing above the tarmac. Sized off the segment it
+     stands on, exactly like the trees and the rivals — one projection, reused. */
+  function drawBoxes(c) {
+    var i, j, b, sh, x, y, sz, ph;
+    for (i = shots.length - 1; i >= 0; i--) {
+      sh = shots[i];
+      if (sh.w < 2) continue;
+      for (j = 0; j < boxes.length; j++) {
+        b = boxes[j];
+        if (b.seg !== sh.idx || b.cool > 0) continue;
+        sz = sh.sc * 460 * H / 2;
+        if (sz < 4) continue;
+        ph = G.t * 2.6 + j;
+        x = sh.x + sh.w * b.x;
+        y = sh.y - sz * 0.72 - Math.sin(ph) * sz * 0.16;
+        c.save();
+        c.translate(x, y);
+        c.rotate(Math.sin(ph * 0.5) * 0.28);
+        c.fillStyle = C.leaf;
+        G.roundRect(c, -sz / 2, -sz / 2, sz, sz, sz * 0.22); c.fill();
+        c.strokeStyle = 'rgba(20,32,18,.75)'; c.lineWidth = Math.max(1, sz * 0.07);
+        G.roundRect(c, -sz / 2, -sz / 2, sz, sz, sz * 0.22); c.stroke();
+        c.fillStyle = C.sun;
+        c.beginPath();
+        c.moveTo(0, -sz * 0.26);
+        c.lineTo(sz * 0.24, sz * 0.06);
+        c.lineTo(0, sz * 0.30);
+        c.lineTo(-sz * 0.24, sz * 0.06);
+        c.closePath(); c.fill();
+        c.restore();
+      }
+    }
+  }
+
   /* Rivals, painted from the back of the draw list forwards so a nearer kart
      covers a farther one, and so a hill hides whoever is behind it — the same
      ordering the road itself uses. Their size comes from the segment they stand
@@ -1811,7 +1956,8 @@ html, body {
         A.kartBack(c, x, sh.y, sz, {
           color: r.color,
           lean: G.clamp(segAt(r.z).curve * 0.12, -1, 1),
-          bob: 0
+          bob: 0,
+          boost: r.boost > 0 ? Math.min(0.85, r.boost) : 0
         });
       }
     }
@@ -1827,7 +1973,8 @@ html, body {
       S.place === 1 ? '#7ee787' : (S.place > 4 ? '#ff8f8f' : null));
     A.pill(c, 792, 104, 190, 74, 'TEMPO', fmtT(S.lapT));
     var kmh = Math.round(S.spd / MAX_SPD * 120);
-    A.pill(c, 1090, H - 104, 150, 74, null, kmh, S.off > 0.4 ? '#ff8f8f' : null);
+    A.pill(c, 1090, H - 104, 150, 74, null, kmh,
+      S.off > 0.4 ? '#ff8f8f' : (S.boost > 0 ? '#7ee787' : null));
 
     if (S.lapShown > 0 && S.t < 3.2 && S.lap > 1) {
       G.text((S.newBest ? 'GIRO RECORD  ' : 'giro  ') + fmtT(S.lapShown), W / 2, 232, {
@@ -1885,9 +2032,10 @@ html, body {
 
     var g = G.kartSave ? G.kartSave() : null;
     if (g) {
-      G.text('giro migliore ' + fmtT(g.best[TRACKS[S.track].id]), W / 2, 156 + 6 * 66 + 6, {
-        ctx: c, size: 26, color: 'rgba(255,246,224,.75)', weight: 800
-      });
+      G.text('giro migliore ' + fmtT(g.best[TRACKS[S.track].id]) + '   ·   premi presi ' + S.took,
+        W / 2, 156 + 6 * 66 + 6, {
+          ctx: c, size: 26, color: 'rgba(255,246,224,.75)', weight: 800
+        });
     }
 
     G.ui.button({
@@ -1918,7 +2066,30 @@ html, body {
   function drawKart(c) {
     var lean = S.leanShown;
     var bump = Math.sin(S.z * 0.004) * (S.spd / MAX_SPD) * (S.off > 0.4 ? 2.6 : 0.6);
-    A.kartBack(c, W / 2 + S.x * 64, H - 74, (CAM_D / CAM_BACK) * KART_W * W / 2, {
+    var kx = W / 2 + S.x * 64;
+
+    /* The drift charge, said in colour and nothing else. There is no gauge and
+       no number: white sparks, then blue, then orange, and letting go while the
+       sparks are coloured is the whole mechanic. A six-year-old learns that in
+       two corners; a three-year-old never has to. */
+    if (S.drift > 0.35 && S.phase === 'gara') {
+      var stage = S.drift >= DRIFT_2 ? 2 : (S.drift >= DRIFT_1 ? 1 : 0);
+      var col = ['rgba(255,246,224,.85)', '#7fd7ff', '#ffb545'][stage];
+      var sd = S.steer > 0 ? -1 : 1;            // sparks fly off the outside wheel
+      c.save();
+      for (var i = 0; i < 7; i++) {
+        var ph = G.t * 22 + i * 1.7;
+        var sx = kx + sd * (104 + (i % 3) * 12) + Math.sin(ph) * 12;
+        var sy = H - 78 + Math.cos(ph * 1.3) * 16;
+        var r = (3 + (i % 3) * 2.4) * (0.7 + stage * 0.35);
+        c.globalAlpha = 0.35 + 0.55 * Math.abs(Math.sin(ph * 0.8));
+        c.fillStyle = col;
+        c.beginPath(); c.arc(sx, sy, r, 0, 6.2832); c.fill();
+      }
+      c.restore();
+    }
+
+    A.kartBack(c, kx, H - 74, (CAM_D / CAM_BACK) * KART_W * W / 2, {
       color: (G.account && G.account.color) || C.dino,
       lean: lean,
       bob: bump,

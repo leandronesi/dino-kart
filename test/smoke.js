@@ -354,6 +354,46 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
     else if (holding !== dir) { ELS.c.dispatch("pointermove", pev(px, 500)); holding = dir; }
   }
 
+  /* DERAPATA. Tengo il dito da un lato in curva finche le scintille non sono
+     arancioni, poi mollo: deve arrivare la spinta. E la meccanica che il
+     bambino di sei anni scoprira da sola, quindi deve esistere davvero e non
+     solo essere disegnata. */
+  // mi metto largo a sinistra, come si imposta una curva, senza toccare l erba
+  ELS.c.dispatch("pointerdown", pev(200, 500));
+  for (let i = 0; i < 200 && G.kartState().x > -0.85; i++) { ELS.c.dispatch("pointermove", pev(200, 500)); pump(1); }
+  ELS.c.dispatch("pointerup", pev(200, 500)); pump(1);
+  if (G.kartState().x < -1) fail("il test non riesce a mettersi largo senza finire sull erba");
+
+  // tengo dall altra parte finche le scintille non sono arancioni, restando
+  // sull asfalto: la carica muore appena una ruota tocca l erba
+  ELS.c.dispatch("pointerdown", pev(1080, 500));
+  for (let i = 0; i < 140; i++) {
+    const s2 = G.kartState();
+    if (s2.drift >= s2.drift2 + 0.1 || s2.x > 0.9) break;
+    ELS.c.dispatch("pointermove", pev(1080, 500)); pump(1);
+  }
+  const charged = G.kartState();
+  if (charged.drift < charged.drift2) fail("la derapata non si carica: " + charged.drift.toFixed(2) + "s di lock");
+  ELS.c.dispatch("pointerup", pev(1080, 500));
+  pump(1);
+  const kicked = G.kartState();
+  if (!(kicked.boost > 0.9)) fail("mollare una derapata carica non da spinta: boost " + kicked.boost.toFixed(2));
+
+  // rientro verso il centro mentre la spinta e ancora viva, senza finire fuori
+  ELS.c.dispatch("pointerdown", pev(200, 500));
+  for (let i = 0; i < 26; i++) { ELS.c.dispatch("pointermove", pev(200, 500)); pump(1); }
+  ELS.c.dispatch("pointerup", pev(200, 500)); pump(1);
+
+  const fast = G.kartState();
+  // sopra il tetto normale: e questo che rende la spinta una spinta
+  if (!(fast.spd > fast.maxSpd * 1.05)) {
+    fail("con la spinta non si va oltre il massimo: " + Math.round(fast.spd) + " contro " + fast.maxSpd);
+  }
+  if (fast.spd > fast.maxSpd * fast.boostMul + 1) fail("la spinta sfonda il tetto: " + Math.round(fast.spd));
+  if (Math.abs(fast.x) >= 1) fail("il test e finito sull erba, la misura della spinta non vale");
+
+  if (G.kartState().boxes < 20) fail("quasi nessuna cassa premio sulla pista: " + G.kartState().boxes);
+
   let offFrames = 0, ran = 0, maxLap = 1, badPlace = 0;
   for (ran = 0; ran < 14000; ran++) {
     st = G.kartState();
@@ -372,6 +412,9 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
   if (badPlace) fail("posizione fuori dal gruppo in " + badPlace + " frame");
   if (st.order !== 6) fail("l ordine d arrivo non ha 6 kart ma " + st.order);
   if (!(st.place >= 1 && st.place <= 6)) fail("posizione finale assurda: " + st.place);
+  /* Chi guida in mezzo alla strada per due giri deve raccogliere qualcosa: le
+     casse sono tre di fila apposta perche prenderne una sia quasi gratis. */
+  if (st.took < 5) fail("in due giri ho preso solo " + st.took + " premi: le casse non si prendono");
 
   /* LA STRADA DEVE ESSERE TENIBILE. Il bug che ha reso il gioco ingiocabile
      era una forza centrifuga piu forte dello sterzo: con quella, correggendo
@@ -396,6 +439,40 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
   pump(30);
   if (G.current !== "pista" || G.kartState().phase !== "via") {
     fail("\"Ancora!\" non fa ripartire una gara nuova");
+  }
+  G.go("menu"); pump(30);
+}
+
+/* CHI NON FA NIENTE NON DEVE VINCERE.
+   Questa e l asserzione piu importante di tutto il file, ed e nata da una frase:
+   "e un anello stupidissimo in cui non devo fare niente". Detta del Girotondo,
+   ma valeva pari pari anche qui — con i primi numeri, un pilota che non toccava
+   mai lo schermo finiva primo, sull asfalto per tutta la gara. Niente errore,
+   niente eccezione, niente disegno sbagliato: solo un gioco che non era un
+   gioco. Un collaudo che guida bene non se ne accorge mai.
+   Quindi qui non si guida affatto, e si pretende di perdere. */
+phase = "chi non guida perde";
+if (G.sceneOf("pista")) {
+  G.kartSave().diff = 1;                       // Corsa: il campo piu veloce
+  G.go("pista"); pump(30);
+  pump(220);                                   // oltre il semaforo, poi mani in mano
+
+  let off = 0, n = 0;
+  for (n = 0; n < 14000; n++) {
+    const s2 = G.kartState();
+    if (s2.phase === "fine") break;
+    if (Math.abs(s2.x) >= 1) off++;
+    pump(1);
+  }
+  const end = G.kartState();
+  if (end.phase !== "fine") {
+    fail("senza guidare la gara non finisce nemmeno: " + n + " frame");
+  } else {
+    if (end.place === 1) fail("si vince senza mai toccare lo schermo: la pista non chiede niente");
+    if (end.place < 4) fail("senza guidare si arriva " + end.place + "esimo: la pista chiede troppo poco");
+    if (off / n < 0.15) {
+      fail("senza guidare si resta in strada per il " + Math.round(100 - off / n * 100) + "% della gara: i curvoni non spingono");
+    }
   }
   G.go("menu"); pump(30);
 }

@@ -60,6 +60,42 @@ vera: conta la strada percorsa, niente aggiustamenti nascosti. Nessun avversario
 è più veloce di te a tavoletta — guidando bene si vince, guidando male si perde,
 e passando un quarto di gara sull'erba si arriva ultimi.
 
+## Derapata e casse premio
+
+- **Casse premio**: tre in fila attraverso la strada, ogni due secondi circa.
+  Passarci dentro dà una spinta, e basta: niente inventario, niente tasto da
+  premere. Un oggetto da usare vorrebbe un dito, e i diti sono già occupati a
+  sterzare. **Le prendono anche gli avversari** — senza quello non è un
+  potenziamento, è un regalo che rende la gara una passeggiata.
+- **Derapata**: tieni il dito da un lato in curva. Le scintille passano da
+  bianche a azzurre a arancioni; molli, e parti. Caricarla non costa niente che
+  un bambino di tre anni non stesse già facendo — tenere premuto *è* come
+  sterza. La bimba grande scoprirà che la tenuta lunga paga il doppio, e quello
+  è il suo gioco in più.
+
+## Il numero che rende questo un gioco
+
+Due costanti, lo sterzo e la forza centrifuga, sono state trovate **simulando**,
+non a occhio: tre piloti fatti correre sul codice vero, uno che corregge presto,
+uno che corregge all'ultimo, e uno che **non tocca mai lo schermo**.
+
+Con i primi valori il pilota passivo arrivava **primo**, sull'asfalto per tutta
+la gara, senza fare niente — cioè lo stesso difetto per cui *Il Girotondo* è
+finito a fare la giostra. Non c'era nessun errore da nessuna parte: solo un gioco
+che non era un gioco, e un collaudo che guidava bene non se ne sarebbe mai
+accorto.
+
+La cura non è stata alzare la centrifuga, che rende la strada intenibile, ma
+**allungare le curve**: curve corte che si alternano si annullano a vicenda,
+mentre un curvone tenuto due secondi e mezzo ti porta fuori di una strada intera
+pur restando istantaneamente più debole del volante a fondo corsa. Adesso il
+pilota passivo passa il 39% della gara sull'erba e arriva ultimo, e chi sterza
+resta pulito e vince.
+
+`test/smoke.js` guida una gara intera senza toccare lo schermo e **pretende di
+perderla**. Ogni asserzione del collaudo è stata verificata in negativo: rotta
+apposta la cosa che controlla, per vedere che l'asserzione se ne accorga.
+
 ## Com'è organizzato
 
 Il motore è quello di Dino Giungla — scene, salvataggi per profilo, HUD, audio
