@@ -30,13 +30,31 @@
   var C = G.C, W = G.W, H = G.H;
 
   var SEG_LEN = 200;             // world length of one segment
-  var ROAD_W = 2000;             // half-width of the road, world units
+  /* HALF-WIDTH OF THE ROAD, and it is the number that made this unplayable.
+     At 2000 the road came out 2688px wide where the kart sits — more than twice
+     the screen — so in the bottom half of the picture you could see NEITHER
+     edge. Nothing told you where on the road you were until you were already
+     off it. Crash Team Racing is the opposite: a road you can see the width of,
+     with both sides in frame. At 1150 the road is about 1.2 screens wide at the
+     kart, so the two edges are always there to steer between. */
+  var ROAD_W = 1150;
+  /* Plan curve values were written when ROAD_W was 2000 and the accumulated
+     bend was in raw world units, which quietly tied "how bent the road looks"
+     to "how wide the road is". Dividing by that old width makes the bend a
+     fraction of the ROAD instead, so ROAD_W is now a purely visual knob and
+     changing it cannot silently restyle every corner on both tracks. */
+  var CURVE_SCALE = 1 / 2000;
   var DRAW_N = 300;              // how many segments ahead we draw
   var CAM_H = 1000;              // camera height above the road
   var CAM_D = 0.84;              // depth-of-field: bigger = narrower lens
   var HORIZON = 300;             // screen y of the vanishing point at rest
   var CAM_BACK = 800;            // how far behind the kart the camera sits
-  var KART_W = 313;              // a kart, in world units — see drawRivals
+  var KART_W = 420;              // a kart, in world units — see drawRivals
+  /* HOW FAR OFF THE ROAD YOU CAN GET. CTR has walls; you can put a wheel on the
+     dirt, you cannot emigrate. At 2.4 road-widths the tarmac left the screen
+     entirely and you were alone in a field with a tree, with no way to tell
+     which way the track had gone — the single worst thing in the game. */
+  var OFF_MAX = 1.30;
 
   /* Palette of whatever track is loaded. Swapped wholesale in buildTrack, so
      nothing downstream has to know which track it is drawing. */
@@ -53,8 +71,8 @@
       sky: ['#7fc6e8', '#cfeafc'],
       prop: 'albero',
       col: {
-        grassLight: '#4f9e3f', grassDark: '#458c37',
-        roadLight: '#6b6f76', roadDark: '#63676e',
+        grassLight: '#57ad45', grassDark: '#3d7c30',
+        roadLight: '#787d86', roadDark: '#5a5e66',
         rumbleLight: '#e8536b', rumbleDark: '#fff6e0',
         laneMark: '#fff6e0'
       },
@@ -110,8 +128,8 @@
       sky: ['#ffb066', '#ffe6b8'],
       prop: 'palma',
       col: {
-        grassLight: '#e8cf94', grassDark: '#dcc084',
-        roadLight: '#7a7f88', roadDark: '#70757e',
+        grassLight: '#f0d79b', grassDark: '#cfae72',
+        roadLight: '#868b95', roadDark: '#666b74',
         rumbleLight: '#3aa7d6', rumbleDark: '#fff6e0',
         laneMark: '#fff6e0'
       },
@@ -251,7 +269,7 @@
       var side = (i % 2 ? 1 : -1);
       props.push({
         seg: si,
-        x: side * (1.35 + ((i * 37) % 11) / 11 * 1.5),
+        x: side * (1.85 + ((i * 37) % 11) / 11 * 1.6),
         kind: (i % 5 === 0) ? 'cartello' : (t.prop || 'albero'),
         h: 900 + ((i * 53) % 7) * 130
       });
@@ -358,7 +376,7 @@
         want += (r.x >= S.x ? 1 : -1) * 0.5;
       }
       r.x += G.clamp(want - r.x, -dt * 1.6, dt * 1.6);
-      r.x = G.clamp(r.x, -1.6, 1.6);
+      r.x = G.clamp(r.x, -OFF_MAX, OFF_MAX);
 
       r.z = wrapZ(r.z + r.spd * dt);
       r.dist += r.spd * dt;
@@ -380,7 +398,7 @@
         S.boost = Math.max(S.boost, 1.1);
         S.took++;
         G.sfx('coin');
-        G.fx.burst(W / 2 + S.x * 64, H - 210, { color: C.sun, count: 12, speed: 300, lift: 160, size: 14 });
+        G.fx.burst(W / 2, H - 210, { color: C.sun, count: 12, speed: 300, lift: 160, size: 14 });
       }
     }
   }
@@ -432,7 +450,7 @@
 
   /* ================================================================ SCENE */
   G.scene('pista', {
-    hud: true, back: true,
+    hud: false, back: true,
 
     enter: function () {
       var g = G.kartSave ? G.kartSave() : { track: 0 };
@@ -506,7 +524,7 @@
          than full lock, or the bend is not a corner, it is a wall; but it must
          be strong enough that a long bend carries you off if you ignore it. */
       S.x -= here.curve * dt * grip * CENTRIF;
-      S.x = G.clamp(S.x, -2.4, 2.4);
+      S.x = G.clamp(S.x, -OFF_MAX, OFF_MAX);
 
       /* The drawn lean lags the finger. Snapping it makes the kart look like a
          cardboard cut-out being flicked; a tenth of a second of lag reads as
@@ -629,7 +647,7 @@
       dx += s.curve;
       cx += dx;
 
-      var p = project(cx - S.x * ROAD_W, s.y, segZ, 0, camY, camZ);
+      var p = project((cx * CURVE_SCALE - S.x) * ROAD_W, s.y, segZ, 0, camY, camZ);
       var cur = { x: p.x, y: p.y, w: p.w, sc: p.s, idx: (base0 + i) % segs.length };
 
       if (prev && cur.y < maxy && cur.y < prev.y) {
@@ -694,7 +712,7 @@
     var i, p, sh, x, h, w;
     for (i = shots.length - 1; i >= 0; i--) {
       sh = shots[i];
-      if (sh.w < 2) continue;
+      if (i < 3 || sh.w < 2) continue;      // see drawBoxes: nothing nearer than the kart
       for (var j = 0; j < props.length; j++) {
         p = props[j];
         if (p.seg !== sh.idx) continue;
@@ -745,11 +763,17 @@
     var i, j, b, sh, x, y, sz, ph;
     for (i = shots.length - 1; i >= 0; i--) {
       sh = shots[i];
-      if (sh.w < 2) continue;
+      /* NOTHING IS DRAWN NEARER THAN THE KART. The camera sits CAM_BACK behind
+         it, which is four segments, so segments 0..3 are the strip of road
+         BETWEEN the lens and the player: anything painted there comes out
+         nearer than the kart, and therefore bigger. Two crates the size of the
+         dino used to flank him on every straight. Same mistake the rivals made
+         once, same cure — one distance rule for everything standing on a road. */
+      if (i < 4 || sh.w < 2) continue;
       for (j = 0; j < boxes.length; j++) {
         b = boxes[j];
         if (b.seg !== sh.idx || b.cool > 0) continue;
-        sz = sh.sc * 460 * H / 2;
+        sz = sh.sc * 300 * H / 2;
         if (sz < 4) continue;
         ph = G.t * 2.6 + j;
         x = sh.x + sh.w * b.x;
@@ -909,7 +933,7 @@
   function drawKart(c) {
     var lean = S.leanShown;
     var bump = Math.sin(S.z * 0.004) * (S.spd / MAX_SPD) * (S.off > 0.4 ? 2.6 : 0.6);
-    var kx = W / 2 + S.x * 64;
+    var kx = W / 2;
 
     /* The drift charge, said in colour and nothing else. There is no gauge and
        no number: white sparks, then blue, then orange, and letting go while the

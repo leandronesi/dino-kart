@@ -111,6 +111,41 @@ e pretende di perderle tutte. Ogni asserzione del collaudo è stata verificata i
 negativo: rotta apposta la cosa che controlla, per vedere che l'asserzione se ne
 accorga.
 
+## Il collaudo che guarda lo schermo
+
+`test/smoke.js` controlla numeri: velocità, giro, posizione, chi vince. Ha
+passato quaranta asserzioni su una build che era **oggettivamente ingiocabile**,
+perché nessuna di quelle asserzioni aveva mai guardato un'immagine.
+
+Tre difetti, tutti invisibili a un test numerico e ovvi in un fotogramma:
+
+- La strada era larga **quasi tre schermi** dove sta il kart, quindi nella metà
+  bassa dell'immagine non si vedeva **nessuno dei due bordi**: guidavi al centro
+  di una lastra grigia senza riferimenti, e scoprivi dov'eri finendo sull'erba.
+- Appena mettevi una ruota fuori l'asfalto usciva **del tutto** dall'inquadratura
+  e restavi in un prato con un albero, senza sapere da che parte fosse la pista.
+- Le bande chiare e scure della strada differivano di **8 unità su 255**: a
+  12.000 o a 4.000 lo schermo era identico, nessun senso di velocità.
+
+Quindi `test/raster.js` è una canvas 2D scritta a mano — poligoni a scanline,
+gradienti, un font 5×7, PNG in uscita, zero dipendenze — e `test/look.js`
+disegna il gioco vero su un bitmap e **asserisce sui pixel**:
+
+```bash
+node test/look.js     # e guarda i fotogrammi in test/frames/
+```
+
+| controlla | perché |
+|---|---|
+| tutti e due i bordi della strada sono in quadro | senza, non sai dove sei |
+| il kart è disegnato al centro e sopra c'è asfalto | scivolava di 64px mentre la strada ne faceva 773 |
+| le bande hanno contrasto ≥14 su 255 | è il contrasto a fare la velocità, non la velocità |
+| al massimo scarto laterale la pista è ancora in vista | CTR ha i muri: puoi sporcare una ruota, non emigrare |
+
+Anche queste verificate in negativo, rimettendo i valori vecchi uno alla volta.
+I fotogrammi in [test/frames/](test/frames/) sono aggiornati a ogni esecuzione:
+è il modo più rapido di vedere il gioco senza tablet.
+
 ## Com'è organizzato
 
 Il motore è quello di Dino Giungla — scene, salvataggi per profilo, HUD, audio
@@ -126,7 +161,14 @@ src/10-pista.js      la strada pseudo-3D, la guida, gli avversari, la gara
 src/99-boot.js       avvio: profilo silenzioso e via al menu
 ```
 
+```
+test/smoke.js    collaudo headless: guida, e controlla i numeri
+test/look.js     collaudo a occhio: disegna, e controlla i pixel
+test/raster.js   la canvas 2D software che serve a look.js
+```
+
 ```bash
 node build.js       # ricostruisce index.html + sw.js
 node test/smoke.js  # collaudo headless
+node test/look.js   # collaudo a occhio, scrive test/frames/*.png
 ```
