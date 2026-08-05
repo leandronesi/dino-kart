@@ -35,6 +35,8 @@
   var CAM_H = 1000;              // camera height above the road
   var CAM_D = 0.84;              // depth-of-field: bigger = narrower lens
   var HORIZON = 300;             // screen y of the vanishing point at rest
+  var CAM_BACK = 800;            // how far behind the kart the camera sits
+  var KART_W = 313;              // a kart, in world units — see drawRivals
 
   var COL = {
     grassLight: '#4f9e3f', grassDark: '#458c37',
@@ -439,12 +441,16 @@
         r = rivals[j];
         di = Math.round(wrapDelta(S.z, r.z) / SEG_LEN);
         if (di !== i || di < 1) continue;         // behind us, or not this slice
-        /* Size comes from how wide the ROAD is at that segment, so a kart is
-           always about the same fraction of the lane. It used to be a constant
-           times the projection scale, which made the nearest rivals seven
-           thousand pixels wide and they drove straight over the camera. */
-        sz = sh.w * 0.86;
-        if (sz < 6 || sz > W * 0.9) continue;
+        /* ONE rule for every kart on screen, mine included. The player is drawn
+           at a fixed 210px because the camera sits a fixed CAM_BACK behind him;
+           a rival dd further up the road is therefore at CAM_BACK + dd, and the
+           same world width gives its size. Before this, the two were sized by
+           different rules that never agreed — a rival ten segments ahead came out
+           462px against my 210, so the thing in the distance was twice the size
+           of the thing in my hands. */
+        var dd = di * SEG_LEN;
+        sz = (CAM_D / (CAM_BACK + dd)) * KART_W * W / 2;
+        if (sz < 5) continue;
         x = sh.x + sh.w * r.x;
         A.kartBack(c, x, sh.y, sz, {
           color: r.color,
@@ -473,7 +479,7 @@
   function drawKart(c) {
     var lean = S.leanShown;
     var bump = Math.sin(S.z * 0.004) * (S.spd / MAX_SPD) * (S.off > 0.4 ? 2.6 : 0.6);
-    A.kartBack(c, W / 2 + S.x * 64, H - 74, 210, {
+    A.kartBack(c, W / 2 + S.x * 64, H - 74, (CAM_D / CAM_BACK) * KART_W * W / 2, {
       color: (G.account && G.account.color) || C.dino,
       lean: lean,
       bob: bump,

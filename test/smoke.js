@@ -290,6 +290,18 @@ if (G.sceneOf("pista")) {
   const stL = G.kartState();
   if (stL.x >= stR.x - 0.05) fail("toccando a sinistra il kart non va a sinistra: x " + stR.x.toFixed(3) + " -> " + stL.x.toFixed(3));
 
+  // NESSUN KART PUO ESSERE PIU GRANDE DEL MIO: chi e piu lontano e piu piccolo.
+  // Era il bug per cui un avversario a dieci segmenti veniva il doppio di me.
+  const W2 = 1280, CAM_D2 = 0.84, CAM_BACK2 = 800, KART_W2 = 313, SEG2 = 200;
+  const mine = (CAM_D2 / CAM_BACK2) * KART_W2 * W2 / 2;
+  let prev = Infinity;
+  for (let d = 1; d <= 60; d++) {
+    const sz = (CAM_D2 / (CAM_BACK2 + d * SEG2)) * KART_W2 * W2 / 2;
+    if (sz > mine) { fail("un avversario a " + d + " segmenti e piu grande del mio kart: " + Math.round(sz) + " > " + Math.round(mine)); break; }
+    if (sz > prev) { fail("la dimensione degli avversari non cala con la distanza, a " + d + " segmenti"); break; }
+    prev = sz;
+  }
+
   // and releasing must stop the steering, not leave it stuck
   const xa = G.kartState().x; pump(60);
   const xb = G.kartState().x;
