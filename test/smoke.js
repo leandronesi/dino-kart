@@ -321,6 +321,15 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
   g.diff = 0;                                  // Facile: 2 giri, e il test dura meno
   const races0 = g.races;
 
+  /* I due tasti pista devono selezionare davvero: con una pista sola nessuno se
+     ne accorgeva, perche era gia scelta. */
+  tap(803, 285);                               // La Spiaggia
+  pump(2);
+  if (G.kartSave().track !== 1) fail("il tasto della seconda pista non la seleziona");
+  tap(477, 285);                               // La Collina
+  pump(2);
+  if (G.kartSave().track !== 0) fail("il tasto della prima pista non la riseleziona");
+
   tap(640, 559);                               // VIA!
   pump(30);
   if (G.current !== "pista") fail("il tasto VIA non porta in pista (sono in \"" + G.current + "\")");
@@ -452,29 +461,55 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
    gioco. Un collaudo che guida bene non se ne accorge mai.
    Quindi qui non si guida affatto, e si pretende di perdere. */
 phase = "chi non guida perde";
-if (G.sceneOf("pista")) {
-  G.kartSave().diff = 1;                       // Corsa: il campo piu veloce
-  G.go("pista"); pump(30);
-  pump(220);                                   // oltre il semaforo, poi mani in mano
+if (G.sceneOf("pista") && G.kartTracks) {
+  const tracks = G.kartTracks();
+  if (tracks.length < 2) fail("c e una pista sola: " + tracks.length);
 
-  let off = 0, n = 0;
-  for (n = 0; n < 14000; n++) {
-    const s2 = G.kartState();
-    if (s2.phase === "fine") break;
-    if (Math.abs(s2.x) >= 1) off++;
-    pump(1);
+  // due piste non possono essere la stessa pista ridipinta a meta
+  const seen = {};
+  tracks.forEach((t) => {
+    if (!t.id || seen[t.id]) fail("due piste con lo stesso id: " + t.id);
+    seen[t.id] = 1;
+    if (!t.col || !t.col.grassLight || !t.plan || !t.plan.length) fail("pista incompleta: " + t.id);
+  });
+  if (tracks.length > 1 && tracks[0].col.grassLight === tracks[1].col.grassLight) {
+    fail("le due piste hanno lo stesso colore: sono la stessa pista");
   }
-  const end = G.kartState();
-  if (end.phase !== "fine") {
-    fail("senza guidare la gara non finisce nemmeno: " + n + " frame");
-  } else {
-    if (end.place === 1) fail("si vince senza mai toccare lo schermo: la pista non chiede niente");
-    if (end.place < 4) fail("senza guidare si arriva " + end.place + "esimo: la pista chiede troppo poco");
-    if (off / n < 0.15) {
-      fail("senza guidare si resta in strada per il " + Math.round(100 - off / n * 100) + "% della gara: i curvoni non spingono");
+
+  // e OGNI pista deve pretendere di essere guidata, non solo la prima
+  for (let ti = 0; ti < tracks.length; ti++) {
+    const g3 = G.kartSave();
+    g3.diff = 1;                               // Corsa: il campo piu veloce
+    g3.track = ti;
+    G.go("pista"); pump(30);
+    pump(220);                                 // oltre il semaforo, poi mani in mano
+
+    let off = 0, n = 0;
+    for (n = 0; n < 14000; n++) {
+      const s2 = G.kartState();
+      if (s2.phase === "fine") break;
+      if (Math.abs(s2.x) >= 1) off++;
+      pump(1);
     }
+    const end = G.kartState();
+    const who = tracks[ti].name;
+    if (end.phase !== "fine") {
+      fail(who + ": senza guidare la gara non finisce nemmeno, " + n + " frame");
+    } else {
+      if (end.place === 1) fail(who + ": si vince senza mai toccare lo schermo, la pista non chiede niente");
+      else if (end.place < 4) fail(who + ": senza guidare si arriva " + end.place + "esimo, chiede troppo poco");
+      if (off / n < 0.15) {
+        fail(who + ": senza guidare si resta in strada per il " + Math.round(100 - off / n * 100) + "%, i curvoni non spingono");
+      }
+      if (end.maxCurve * end.centrif > end.steerRate * 0.7) {
+        fail(who + ": la curva piu stretta spinge " + (end.maxCurve * end.centrif).toFixed(2) + " contro uno sterzo di " + end.steerRate.toFixed(2));
+      }
+      // un giro di venti secondi, su ogni pista
+      const lap = n * 0.0167 / end.laps;
+      if (lap < 12) fail(who + ": il giro dura solo " + lap.toFixed(1) + "s");
+    }
+    G.go("menu"); pump(30);
   }
-  G.go("menu"); pump(30);
 }
 
 phase = "salvataggio";

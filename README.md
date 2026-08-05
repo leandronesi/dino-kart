@@ -73,6 +73,20 @@ e passando un quarto di gara sull'erba si arriva ultimi.
   sterza. La bimba grande scoprirà che la tenuta lunga paga il doppio, e quello
   è il suo gioco in più.
 
+## Le due piste
+
+| | carattere | giro |
+|---|---|---|
+| **La Collina** | prati e saliscendi, curvoni aperti su cui ti appoggi | ~19s |
+| **La Spiaggia** | stretta e nervosa: più curve, meno strada in mezzo, e una sinistra lunga in fondo | ~17s |
+
+Non è la stessa pista ridipinta: cambiano il tracciato, il cielo, i colori
+dell'asfalto e del fuoripista, e gli alberi diventano palme. Il collaudo lo
+pretende — due piste con lo stesso verde sono una pista sola, e lo dice.
+
+Il giro migliore è salvato **per pista**, e compare sul tasto al posto della
+descrizione appena ne hai fatto uno.
+
 ## Il numero che rende questo un gioco
 
 Due costanti, lo sterzo e la forza centrifuga, sono state trovate **simulando**,
@@ -92,9 +106,10 @@ pur restando istantaneamente più debole del volante a fondo corsa. Adesso il
 pilota passivo passa il 39% della gara sull'erba e arriva ultimo, e chi sterza
 resta pulito e vince.
 
-`test/smoke.js` guida una gara intera senza toccare lo schermo e **pretende di
-perderla**. Ogni asserzione del collaudo è stata verificata in negativo: rotta
-apposta la cosa che controlla, per vedere che l'asserzione se ne accorga.
+`test/smoke.js` guida una gara intera **su ogni pista** senza toccare lo schermo
+e pretende di perderle tutte. Ogni asserzione del collaudo è stata verificata in
+negativo: rotta apposta la cosa che controlla, per vedere che l'asserzione se ne
+accorga.
 
 ## Com'è organizzato
 

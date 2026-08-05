@@ -79,16 +79,20 @@
       /* Track picker. One track today, and the row is built from the list so the
          second one needs no new layout. */
       var tracks = G.kartTracks ? G.kartTracks() : [{ name: 'La Collina' }];
+      if (g.track >= tracks.length) g.track = 0;
       var tw = 300, tg = 26;
       var tx0 = (W - (tracks.length * tw + (tracks.length - 1) * tg)) / 2;
       for (i = 0; i < tracks.length; i++) {
         (function (idx) {
+          var t = tracks[idx];
           var bx = tx0 + idx * (tw + tg), on = g.track === idx;
           G.ui.button({
             id: 'trk' + idx, x: bx, y: 226, w: tw, h: 118, r: 26,
             color: on ? C.leaf : 'rgba(255,246,224,.22)',
-            label: tracks[idx].name, fontSize: 34,
-            sub: fmt(g.best[tracks[idx].id]) + ' il giro',
+            label: t.name, fontSize: 34,
+            /* The best lap once you have one, the track's character until then:
+               a row of "--" tells a child nothing about which one to pick. */
+            sub: g.best[t.id] ? fmt(g.best[t.id]) + ' il giro' : (t.sub || ''),
             onTap: function () { g.track = idx; G.saveNow(); G.sfx('pop'); }
           });
         })(i);

@@ -38,12 +38,9 @@
   var CAM_BACK = 800;            // how far behind the kart the camera sits
   var KART_W = 313;              // a kart, in world units — see drawRivals
 
-  var COL = {
-    grassLight: '#4f9e3f', grassDark: '#458c37',
-    roadLight: '#6b6f76', roadDark: '#63676e',
-    rumbleLight: '#e8536b', rumbleDark: '#fff6e0',
-    laneMark: '#fff6e0'
-  };
+  /* Palette of whatever track is loaded. Swapped wholesale in buildTrack, so
+     nothing downstream has to know which track it is drawing. */
+  var COL = {};
 
   /* --------------------------------------------------------------- track */
   /* A track is built from a handful of instructions; the segment list is
@@ -52,7 +49,15 @@
     {
       id: 'collina',
       name: 'La Collina',
+      sub: 'prati e saliscendi',
       sky: ['#7fc6e8', '#cfeafc'],
+      prop: 'albero',
+      col: {
+        grassLight: '#4f9e3f', grassDark: '#458c37',
+        roadLight: '#6b6f76', roadDark: '#63676e',
+        rumbleLight: '#e8536b', rumbleDark: '#fff6e0',
+        laneMark: '#fff6e0'
+      },
       /* A LAP IS TWENTY SECONDS. The first version of this plan came to 580
          segments, which at full speed is a lap every ten — so an easy race was
          over in nineteen seconds, before a child had finished working out which
@@ -89,6 +94,47 @@
         ['ultima curva dx', 90, 3.0, 0],
         ['rettilineo finale', 100, 0, 0]
       ]
+    },
+
+    /* THE SECOND TRACK, and its job is to be a different drive, not the same
+       drive repainted. La Collina is long open bends you lean on; La Spiaggia is
+       shorter, tighter and busier — more corners per minute, less road between
+       them, and a sting in the tail. It went through the same simulation as the
+       first: a driver who never touches the screen has to finish last here too,
+       and the sharpest bend has to stay inside full lock. Different feel, same
+       two rules. */
+    {
+      id: 'spiaggia',
+      name: 'La Spiaggia',
+      sub: 'stretta e nervosa',
+      sky: ['#ffb066', '#ffe6b8'],
+      prop: 'palma',
+      col: {
+        grassLight: '#e8cf94', grassDark: '#dcc084',
+        roadLight: '#7a7f88', roadDark: '#70757e',
+        rumbleLight: '#3aa7d6', rumbleDark: '#fff6e0',
+        laneMark: '#fff6e0'
+      },
+      plan: [
+        ['rettilineo di partenza', 70, 0, 0],
+        ['curva sx sul mare', 110, -2.8, 0],
+        ['contro-curva dx', 100, 2.8, 0],
+        ['dritto corto', 35, 0, 0],
+        ['salitella', 30, 0, 18],
+        ['curvone dx sulle dune', 130, 2.4, 0],
+        ['discesa', 30, 0, -18],
+        ['esse sx', 55, -3.0, 0],
+        ['esse dx', 55, 3.0, 0],
+        ['esse sx di nuovo', 55, -3.0, 0],
+        ['dritto', 45, 0, 0],
+        ['curvone sx lungo il molo', 140, -2.6, 0],
+        ['dossetto', 26, 0, 20],
+        ['contro-dossetto', 26, 0, -20],
+        ['curva dx stretta', 85, 3.0, 0],
+        ['respiro', 40, 0, 0],
+        ['ultima sx', 100, -2.9, 0],
+        ['rettilineo del traguardo', 80, 0, 0]
+      ]
     }
   ];
 
@@ -99,6 +145,7 @@
 
   function buildTrack(t) {
     segs.length = 0;
+    COL = t.col;
     var i, j, p, n;
     for (i = 0; i < t.plan.length; i++) {
       p = t.plan[i];
@@ -195,7 +242,7 @@
      12000 units a second and one that scrolls at 4000 look nearly identical.
      Placed once per track, at a fixed side offset. */
   var props = [];
-  function buildProps() {
+  function buildProps(t) {
     props.length = 0;
     var i, n = Math.floor(segs.length / 4);
     for (i = 0; i < n; i++) {
@@ -205,7 +252,7 @@
       props.push({
         seg: si,
         x: side * (1.35 + ((i * 37) % 11) / 11 * 1.5),
-        kind: (i % 5 === 0) ? 'cartello' : 'albero',
+        kind: (i % 5 === 0) ? 'cartello' : (t.prop || 'albero'),
         h: 900 + ((i * 53) % 7) * 130
       });
     }
@@ -394,7 +441,7 @@
       S.rivalScale = d.rivalScale;
 
       buildTrack(TRACKS[S.track]);
-      buildProps();
+      buildProps(TRACKS[S.track]);
       buildBoxes();
       buildRivals();
       S.z = 0; S.x = 0; S.spd = 0; S.steer = 0; S.off = 0;
@@ -656,6 +703,22 @@
           c.lineTo(x + w * 0.5, sh.y - h * 0.30);
           c.lineTo(x - w * 0.5, sh.y - h * 0.30);
           c.closePath(); c.fill();
+        } else if (p.kind === 'palma') {
+          /* A bare trunk with a crown of fronds. Drawn with the same two
+             primitives as the pine, so the beach costs nothing extra. */
+          c.fillStyle = '#8a6a3a';
+          c.fillRect(x - w * 0.055, sh.y - h * 0.78, w * 0.11, h * 0.78);
+          c.fillStyle = '#2f8f57';
+          for (var f = 0; f < 5; f++) {
+            var ang = -2.6 + f * 0.78;
+            c.beginPath();
+            c.moveTo(x, sh.y - h * 0.80);
+            c.lineTo(x + Math.cos(ang) * w * 0.62, sh.y - h * 0.80 + Math.sin(ang) * h * 0.24);
+            c.lineTo(x + Math.cos(ang) * w * 0.50, sh.y - h * 0.66 + Math.sin(ang) * h * 0.24);
+            c.closePath(); c.fill();
+          }
+          c.fillStyle = '#c98a3a';
+          c.beginPath(); c.arc(x, sh.y - h * 0.76, Math.max(1, w * 0.07), 0, 6.2832); c.fill();
         } else {
           c.fillStyle = '#7a4a26';
           c.fillRect(x - w * 0.05, sh.y - h * 0.5, w * 0.10, h * 0.5);
