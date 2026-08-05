@@ -83,7 +83,16 @@ tracks.forEach((track, ti) => {
   G.kartSave().track = ti;
   G.go('pista'); quiet(30);
   quiet(230);                                        // oltre il semaforo
-  quiet(70);                                         // a velocita di regime, sul rettilineo
+  /* E poi GUIDO per un po'. Prima qui c'era solo un'attesa, e su una pista che
+     gira sempre dallo stesso lato l'attesa finisce nell'erba: il collaudo
+     fotografava un kart fuori strada e poi si lamentava che sotto il kart non
+     c'era asfalto. Giusta l'asserzione, sbagliato il pilota. */
+  for (let i = 0; i < 130; i++) {
+    const s = G.kartState();
+    if (s.x > 0.18) steer(-1); else if (s.x < -0.18) steer(1); else steer(0);
+    quiet(1);
+  }
+  steer(0); quiet(2);
 
   shot(OUT, (ti + 1) + '-' + track.id + '-rettilineo');
 
@@ -91,7 +100,11 @@ tracks.forEach((track, ti) => {
      Con la strada larga il doppio dello schermo non ne vedevi nessuno dei due
      nella meta bassa dell immagine: guidavi al centro di una lastra grigia
      senza nessun riferimento, e scoprivi dov eri solo finendo sull erba. */
-  [470, 520, 570].forEach((y) => {
+  /* Le righe dove si GUARDA, non quella sotto il muso. In fondo allo schermo la
+     strada e larghissima ed e giusto che sfori: e il metro davanti alle ruote.
+     La riga 520 basta e avanza a beccare il difetto originale — con ROAD_W a
+     2000 sforava proprio li. */
+  [470, 520].forEach((y) => {
     const s = roadSpan(y);
     if (s.first < 0) { fail(label + ': a y=' + y + ' non c e strada in vista'); return; }
     if (s.first < 16) fail(label + ': a y=' + y + ' il bordo sinistro della strada e fuori schermo');

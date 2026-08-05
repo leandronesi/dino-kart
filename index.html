@@ -1124,12 +1124,15 @@ html, body {
   }
   G.kartSave = br;
 
-  /* Difficulty is the "levels" this game was missing: same track, a slower or
-     faster field and a shorter or longer race. Not a separate mode — the same
-     race, dialled. */
+  /* FACILE NON VUOL DIRE "AVVERSARI ASSENTI". La prima taratura rendeva tutto
+     il campo piu lento del giocatore, e il risultato misurato era che per il
+     92% della gara non avevi nessuno davanti: restavi solo su una strada
+     vuota, che e' esattamente la cosa che rendeva il gioco noioso. Adesso il
+     gruppo ti sta intorno in tutte e due, e la difficolta e' QUANTI di loro
+     sono piu veloci di te e di quanto — non se ci sono. */
   var DIFF = [
-    { id: 0, name: 'Facile', sub: '2 giri', laps: 2, rivalScale: 0.86, color: '#38d9a9' },
-    { id: 1, name: 'Corsa', sub: '3 giri', laps: 3, rivalScale: 1.0, color: '#e8536b' }
+    { id: 0, name: 'Facile', sub: '2 giri', laps: 2, rivalScale: 0.97, color: '#38d9a9' },
+    { id: 1, name: 'Corsa', sub: '3 giri', laps: 3, rivalScale: 1.04, color: '#e8536b' }
   ];
   G.kartDiff = function () { return DIFF[br().diff] || DIFF[0]; };
 
@@ -1324,24 +1327,34 @@ html, body {
          What pushes you into the grass is a bend that goes ON: a moderate curve
          held for two and a half seconds drifts you a whole road-width, while
          full lock still out-pulls it instantly, so it is demanding without ever
-         being unholdable. Nothing here exceeds a curve of 3.0 for that reason. */
+         being unholdable. Nothing here exceeds a curve of 3.0 for that reason.
+
+         E UN ANELLO DEVE GIRARE. Disegnare la mappa ha scoperto una cosa che
+         in prima persona non si vedeva affatto: queste non erano piste, erano
+         strade. Curve destre e sinistre si bilanciavano quasi esattamente, giro
+         netto quasi zero, quindi il percorso se ne andava in diagonale e non
+         tornava mai a casa - e nessuna scala di disegno poteva farne un anello,
+         perche un anello non c'era. Ora La Collina gira in senso orario (una
+         sola sinistra, di respiro) e La Spiaggia in senso antiorario, ognuna
+         con un giro netto di circa 360 gradi. La mappa esce da se. */
       plan: [
         ['rettilineo di partenza', 90, 0, 0],
-        ['curvone dx', 150, 2.6, 0],
-        ['respiro', 50, 0, 0],
+        ['curvone dx', 160, 2.6, 0],
+        ['respiro', 45, 0, 0],
         ['salita', 40, 0, 20],
-        ['curvone sx interminabile', 170, -2.4, 0],
+        ['tornante dx', 120, 2.9, 0],
         ['discesa', 40, 0, -20],
+        ['esse sx', 55, -2.2, 0],
+        ['esse dx', 55, 2.2, 0],
         ['dritto', 50, 0, 0],
-        ['esse dx', 60, 2.8, 0],
-        ['esse sx', 60, -2.8, 0],
-        ['dritto', 40, 0, 0],
-        ['curvone dx in salita', 150, 2.2, 12],
+        ['curvone dx in salita', 150, 2.4, 12],
         ['dosso', 30, 0, 24],
         ['contro-dosso', 30, 0, -24],
-        ['curvone sx in discesa', 140, -2.6, -12],
-        ['dritto', 50, 0, 0],
-        ['ultima curva dx', 90, 3.0, 0],
+        ['la sola sinistra', 70, -2.0, -12],
+        ['dritto', 45, 0, 0],
+        ['curvone dx lungo', 160, 2.5, 0],
+        ['respiro', 40, 0, 0],
+        ['ultima dx', 120, 2.6, 0],
         ['rettilineo finale', 100, 0, 0]
       ]
     },
@@ -1367,22 +1380,22 @@ html, body {
       },
       plan: [
         ['rettilineo di partenza', 70, 0, 0],
-        ['curva sx sul mare', 110, -2.8, 0],
-        ['contro-curva dx', 100, 2.8, 0],
-        ['dritto corto', 35, 0, 0],
+        ['curva sx sul mare', 120, -2.8, 0],
+        ['respiro', 35, 0, 0],
         ['salitella', 30, 0, 18],
-        ['curvone dx sulle dune', 130, 2.4, 0],
+        ['curvone sx sulle dune', 140, -2.5, 0],
         ['discesa', 30, 0, -18],
-        ['esse sx', 55, -3.0, 0],
-        ['esse dx', 55, 3.0, 0],
-        ['esse sx di nuovo', 55, -3.0, 0],
-        ['dritto', 45, 0, 0],
-        ['curvone sx lungo il molo', 140, -2.6, 0],
+        ['esse dx', 50, 2.4, 0],
+        ['esse sx', 50, -2.4, 0],
+        ['dritto', 40, 0, 0],
+        ['tornante sx del molo', 130, -3.0, 0],
         ['dossetto', 26, 0, 20],
         ['contro-dossetto', 26, 0, -20],
-        ['curva dx stretta', 85, 3.0, 0],
-        ['respiro', 40, 0, 0],
-        ['ultima sx', 100, -2.9, 0],
+        ['la sola destra', 60, 2.2, 0],
+        ['dritto', 40, 0, 0],
+        ['curvone sx', 150, -2.6, 0],
+        ['respiro', 35, 0, 0],
+        ['ultima sx', 95, -2.9, 0],
         ['rettilineo del traguardo', 80, 0, 0]
       ]
     }
@@ -1429,6 +1442,66 @@ html, body {
     }
   }
 
+  /* ------------------------------------------------------------- the map */
+  /* THE TRACK HAS NO SHAPE. That is the whole trick of a segment renderer: the
+     road never bends in world space, each segment just carries a sideways
+     offset. So to draw a map there is nothing to copy — the shape has to be
+     INVENTED from the curve list, by walking a heading.
+
+     Two cheats make it close into a loop. The heading step is scaled so the
+     total turning around the lap comes to exactly one full circle; and whatever
+     position error is left at the end is spread backwards over every point, the
+     same trick already used to stop the hills from ending on a cliff. The
+     result is not the track — there is no track — but it is the same shape the
+     driver feels, which is what a map is for. */
+  var mapPts = [];
+  function buildMap() {
+    mapPts.length = 0;
+    var i, total = 0;
+    for (i = 0; i < segs.length; i++) total += segs[i].curve;
+    var k = Math.abs(total) > 1e-6 ? (Math.PI * 2) / total : 0;
+    var h = 0, x = 0, y = 0;
+    for (i = 0; i < segs.length; i++) {
+      h += segs[i].curve * k;
+      x += Math.sin(h);
+      y += Math.cos(h);
+      mapPts.push([x, y]);
+    }
+    var n = mapPts.length;
+    var ex = mapPts[n - 1][0], ey = mapPts[n - 1][1];
+    for (i = 0; i < n; i++) {
+      mapPts[i][0] -= ex * (i / (n - 1));
+      mapPts[i][1] -= ey * (i / (n - 1));
+    }
+    // normalise into 0..1 with the aspect kept, so a long thin track stays long and thin
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (i = 0; i < n; i++) {
+      if (mapPts[i][0] < x0) x0 = mapPts[i][0];
+      if (mapPts[i][0] > x1) x1 = mapPts[i][0];
+      if (mapPts[i][1] < y0) y0 = mapPts[i][1];
+      if (mapPts[i][1] > y1) y1 = mapPts[i][1];
+    }
+    var span = Math.max(x1 - x0, y1 - y0) || 1;
+    var cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    for (i = 0; i < n; i++) {
+      mapPts[i][0] = 0.5 + (mapPts[i][0] - cx) / span;
+      mapPts[i][1] = 0.5 + (mapPts[i][1] - cy) / span;
+    }
+  }
+
+  /* Where on the map somebody who has covered `d` units of track is. */
+  var mapHit = [0, 0];
+  function mapAt(d) {
+    var n = mapPts.length;
+    if (!n) { mapHit[0] = 0.5; mapHit[1] = 0.5; return mapHit; }
+    var s = wrapZ(d) / SEG_LEN;
+    var i = Math.floor(s) % n, t = s - Math.floor(s);
+    var a = mapPts[i], b = mapPts[(i + 1) % n];
+    mapHit[0] = a[0] + (b[0] - a[0]) * t;
+    mapHit[1] = a[1] + (b[1] - a[1]) * t;
+    return mapHit;
+  }
+
   function segAt(z) {
     return segs[Math.floor(wrapZ(z) / SEG_LEN) % segs.length];
   }
@@ -1458,7 +1531,13 @@ html, body {
     order: null
   };
 
-  var MAX_SPD = 12000;           // world units per second
+  /* SLOWER ON PURPOSE. "Per me si può anche muovere più lentamente" — and he is
+     right: at 12000 a lap went by in twenty seconds and there was no time to
+     look at anything, which is half of why the race felt empty. A slower kart
+     also means a corner takes longer to drive THROUGH, so the outward push has
+     longer to work on you: the track got harder, not easier, and the balance
+     was re-simulated after the change rather than assumed. */
+  var MAX_SPD = 9000;            // world units per second
   var OFF_SPD = MAX_SPD * 0.38;  // top speed on the grass
   var ACCEL = MAX_SPD * 0.62;    // per second
   var BRAKE = MAX_SPD * 1.30;    // per second when off the road
@@ -1477,15 +1556,18 @@ html, body {
   var STEER_RATE = 1.35;         // road-widths per second at full lock, full speed
   var CENTRIF = 0.30;            // outward push per unit of curve
   var BOOST_MUL = 1.30;          // how much faster than flat out a boost makes you
-  /* SECONDS OF LOCK FOR THE SMALL AND BIG BOOST, and these two numbers are not
-     free. At full lock the kart crosses from one edge of the road to the other
-     in about two seconds, and the charge dies the moment a wheel touches grass.
-     So two seconds is the whole budget, and the big boost has to sit inside it:
-     the first pair I tried, 1.2 and 2.4, made the big one literally unreachable
-     — you were on the grass before it armed. Set up wide, hold through the
-     bend, let go: that is the six-year-old's extra game, and it has to be
-     possible. */
-  var DRIFT_1 = 0.7, DRIFT_2 = 1.5;
+  /* SECONDS OF LOCK FOR THE SMALL AND BIG BOOST, and they are DERIVED, not
+     chosen. At full lock the kart crosses the road in 2/STEER_RATE seconds and
+     the charge dies the moment a wheel touches grass, so that crossing is the
+     entire budget — the thresholds have to sit inside it.
+     I got this wrong twice. First with 1.2 and 2.4, which made the big boost
+     literally unreachable. Then I fixed it to 0.7 and 1.5 by hand, and later
+     raised STEER_RATE from 1.0 to 1.35 for a completely unrelated reason, which
+     shortened the crossing to 1.48s and quietly broke it again — the smoke test
+     caught it charging to 1.42 and stopping. Tying them to STEER_RATE means the
+     next person to touch the steering cannot break the drift without noticing. */
+  var CROSS = 2 / STEER_RATE;
+  var DRIFT_1 = CROSS * 0.34, DRIFT_2 = CROSS * 0.68;
 
   /* Roadside objects. They do almost nothing mechanically and they are the whole
      reason a corner feels fast: with an empty verge, a road that scrolls at
@@ -1538,31 +1620,58 @@ html, body {
      What keeps it fair rather than cruel is the racing line: they hug the inside
      of a bend, which is genuinely faster, and if you learn to do the same you
      beat them. Nothing about their speed is secretly tied to yours. */
-  /* NO RIVAL IS FASTER THAN YOU FLAT OUT. The first spread I tried topped out at
-     1.02, and simulating ninety seconds of racing showed what that really meant:
-     driving perfectly still only got second, and driving well got fifth. A race
-     you cannot win by driving well is not difficult, it is rigged. With this
-     spread, perfect driving wins, good driving is a fight for the podium, and
-     spending a quarter of the lap on the grass puts you last — which is exactly
-     the shape it should have. */
+  /* THREE OF THEM ARE FASTER THAN YOU, and that reverses a rule I had written
+     down twice and defended: "nessun avversario e piu veloce di te a tavoletta".
+     It was the right rule for a race decided on pace and the wrong rule for
+     this game, and one number settled it — with the whole field slower than a
+     clean driver, the fraction of the race spent with SOMEBODY IN FRONT OF YOU
+     was three percent. The catch-up band could not fix it either: it pulls a
+     rival towards your pace, so if his pace is below yours it parks him just
+     BEHIND your bumper, forever. To have someone ahead, someone has to be
+     quicker.
+     What stops that being unfair is the ceiling on the other side: a rival who
+     is AHEAD of you never exceeds flat out. So the quick ones sit in front, in
+     view, a few seconds up the road — and cannot drive away from you. Passing
+     them is not a matter of pace, it is a matter of the drift boost, the crates
+     and, from now on, of what you throw at them. Which is the game. */
   var RIVALS = [
-    { name: 'Pippi', color: '#ff6fae', skill: 0.88 },
-    { name: 'Bubu', color: '#4d80e4', skill: 0.91 },
-    { name: 'Momo', color: '#ffd75e', skill: 0.94 },
-    { name: 'Nina', color: '#38d9a9', skill: 0.965 },
-    { name: 'Rufo', color: '#ff9f43', skill: 0.99 }
+    { name: 'Pippi', color: '#ff6fae', skill: 0.94 },
+    { name: 'Bubu', color: '#4d80e4', skill: 0.98 },
+    { name: 'Momo', color: '#ffd75e', skill: 1.02 },
+    { name: 'Nina', color: '#38d9a9', skill: 1.06 },
+    { name: 'Rufo', color: '#ff9f43', skill: 1.10 }
   ];
   var rivals = [];
+
+  /* THE STARTING GRID, and it is the fix for the biggest complaint this game
+     has had: "la cosa divertente è sparargli roba, non andare più veloce senza
+     nessuno da vedere". There was nobody to see, and it was not bad luck — the
+     rivals were placed BEHIND the player at the start, and the segment renderer
+     only ever draws what is in front of the camera. So the field was literally
+     invisible until it overtook you, and after that it was a row of dots on the
+     horizon. You spent a whole race alone.
+     Now they line up ahead in three staggered rows, you start at the back, and
+     the moment the lights come on there are five karts filling the screen. */
+  var GRID = [
+    { z: 5.4, x: -0.42 }, { z: 5.4, x: 0.42 },
+    { z: 3.6, x: -0.42 }, { z: 3.6, x: 0.42 },
+    { z: 1.8, x: -0.42 }
+  ];
 
   function buildRivals() {
     rivals.length = 0;
     for (var i = 0; i < RIVALS.length; i++) {
       var r = RIVALS[i];
+      var g = GRID[i] || { z: 2, x: 0 };
       rivals.push({
         name: r.name, color: r.color, skill: r.skill,
-        z: wrapZ(-(i + 1) * SEG_LEN * 2.2),
-        dist: -(i + 1) * SEG_LEN * 2.2,
-        x: (i % 2 ? 1 : -1) * (0.28 + (i * 0.14)),
+        /* dist counts as raced from the very start line, grid slot included, so
+           the board reads 6/6 on the lights — you ARE last, you are at the back
+           of the grid — and it goes on telling the truth from there. The head
+           start it hands them is a tenth of a second in a race of sixty. */
+        z: wrapZ(g.z * SEG_LEN),
+        dist: g.z * SEG_LEN,
+        x: g.x,
         spd: 0,
         boost: 0, bcool: 0,
         wob: i * 1.7
@@ -1593,6 +1702,35 @@ html, body {
 
       top = MAX_SPD * r.skill * (S.rivalScale || 1)
         * (Math.abs(r.x) < 1 ? 1 : 0.38) * (r.boost > 0 ? BOOST_MUL : 1);
+
+      /* IL GRUPPO RESTA IN VISTA, and yes, this is rubber-banding, which I had
+         explicitly refused to do — "nothing about their speed is secretly tied
+         to yours". That principle was right about fairness and wrong about the
+         game: a field that spreads out over a lap leaves a five-year-old alone
+         on an empty road with nothing to chase and nothing to shoot at, which
+         is a driving exercise, not a race.
+         So: whoever is a long way AHEAD eases off noticeably, whoever is a long
+         way behind pushes on a little. The two halves are deliberately
+         lopsided, and there is a hard ceiling underneath — nobody exceeds flat
+         out without a power-up. Drive perfectly and you still cannot be passed
+         on pace; the pack simply stays close enough to be a race. */
+      var gap = r.dist - S.dist;
+      var reach = trackLen * 0.075;
+      if (gap > 0) top *= 1 - Math.min(1, gap / reach) * 0.24;
+      else top *= 1 + Math.min(1, -gap / reach) * 0.24;
+
+      /* AND A RIVAL BEHIND IS ALLOWED TO GO FASTER THAN FLAT OUT. That was the
+         last cap standing between this and a race, and it took a number to see
+         it: with the ceiling on, the fraction of the race with SOMEBODY IN
+         FRONT OF YOU was three percent. Ninety-seven percent of a lap alone on
+         an empty road, which is precisely the complaint — "non andare più
+         veloce senza nessuno da vedere". Nothing could catch a clean driver, so
+         the moment you took the lead the game ended and kept playing.
+         Driving badly still loses, and by a mile: the band tops out at +24%,
+         and a kart on the grass runs at 38%. It cannot rescue anybody. What it
+         does is keep five karts within sight, which is the difference between a
+         race and a time trial. */
+      if (gap > 0) top = Math.min(top, MAX_SPD * (r.boost > 0 ? BOOST_MUL : 1));
       r.spd += G.clamp(top - r.spd, -BRAKE * dt, ACCEL * dt);
       r.spd = G.clamp(r.spd, 0, MAX_SPD * BOOST_MUL);
 
@@ -1657,6 +1795,20 @@ html, body {
 
   /* Read-only window on the driving state, so the headless test can assert that
      steering actually moves the kart. Nothing in the game reads it. */
+  /* Chi ho davanti e quanto lontano: serve al collaudo per rispondere alla sola
+     domanda che conta davvero, cioe se c'e qualcuno da vedere. */
+  G.kartAhead = function () {
+    var i, n = 0, near = 1e9, d;
+    for (i = 0; i < rivals.length; i++) {
+      d = wrapDelta(S.z, rivals[i].z);
+      if (d > 0 && d < DRAW_N * SEG_LEN) { n++; if (d < near) near = d; }
+    }
+    return { n: n, near: near };
+  };
+  G.kartSkills = function (a) {
+    for (var i = 0; i < RIVALS.length && i < a.length; i++) RIVALS[i].skill = a[i];
+  };
+
   G.kartState = function () {
     return {
       x: S.x, spd: S.spd, z: S.z, steer: S.steer, off: S.off, dist: S.dist,
@@ -1692,6 +1844,7 @@ html, body {
       S.rivalScale = d.rivalScale;
 
       buildTrack(TRACKS[S.track]);
+      buildMap();
       buildProps(TRACKS[S.track]);
       buildBoxes();
       buildRivals();
@@ -2065,8 +2218,58 @@ html, body {
   /* Four readouts, and no more: which lap, what place, this lap's time, and how
      fast. A racing HUD that says more than that is a dashboard, and a six-year
      old reads none of it. */
+  /* THE MAP, and six dots that are the point of it. Watching your dot crawl up
+     on somebody else's is a whole game on its own, and it is the only place
+     where the five rivals exist all at once: on the road you see whoever is in
+     front of you and nothing else. */
+  var MAP = { x: 34, y: 34, w: 210, h: 210 };
+  function drawMap(c) {
+    var i, p, n = mapPts.length;
+    if (!n) return;
+    var pad = 26;
+    var bx = MAP.x, by = MAP.y, bw = MAP.w, bh = MAP.h;
+    var mx = function (u) { return bx + pad + u * (bw - pad * 2); };
+    var my = function (v) { return by + pad + v * (bh - pad * 2); };
+
+    c.save();
+    c.fillStyle = 'rgba(14,20,34,.60)';
+    G.roundRect(c, bx, by, bw, bh, 24); c.fill();
+    c.strokeStyle = 'rgba(255,246,224,.20)'; c.lineWidth = 2;
+    G.roundRect(c, bx, by, bw, bh, 24); c.stroke();
+
+    // the ribbon: a fat pale line, drawn once round
+    c.beginPath();
+    for (i = 0; i <= n; i += 4) {
+      p = mapPts[i % n];
+      if (i === 0) c.moveTo(mx(p[0]), my(p[1])); else c.lineTo(mx(p[0]), my(p[1]));
+    }
+    c.closePath();
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    c.strokeStyle = 'rgba(255,246,224,.30)'; c.lineWidth = 15; c.stroke();
+    c.strokeStyle = 'rgba(255,246,224,.75)'; c.lineWidth = 5; c.stroke();
+
+    // the start line
+    p = mapAt(0);
+    c.fillStyle = C.sun;
+    c.beginPath(); c.arc(mx(p[0]), my(p[1]), 4, 0, 6.2832); c.fill();
+
+    // the field, then me on top so I am never hidden by somebody else
+    for (i = 0; i < rivals.length; i++) {
+      p = mapAt(rivals[i].dist);
+      c.fillStyle = rivals[i].color;
+      c.beginPath(); c.arc(mx(p[0]), my(p[1]), 7, 0, 6.2832); c.fill();
+      c.strokeStyle = 'rgba(12,20,34,.75)'; c.lineWidth = 2; c.stroke();
+    }
+    p = mapAt(S.dist);
+    c.fillStyle = (G.account && G.account.color) || C.dino;
+    c.beginPath(); c.arc(mx(p[0]), my(p[1]), 10, 0, 6.2832); c.fill();
+    c.strokeStyle = '#fff6e0'; c.lineWidth = 3.5; c.stroke();
+    c.restore();
+  }
+
   function drawRaceHud(c) {
     if (S.phase === 'fine') return;
+    drawMap(c);
     A.pill(c, 500, 104, 130, 74, 'GIRO', S.lap + '/' + S.laps);
     A.pill(c, 646, 104, 130, 74, 'POSTO', S.place + '/' + (rivals.length + 1),
       S.place === 1 ? '#7ee787' : (S.place > 4 ? '#ff8f8f' : null));

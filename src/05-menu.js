@@ -22,12 +22,15 @@
   }
   G.kartSave = br;
 
-  /* Difficulty is the "levels" this game was missing: same track, a slower or
-     faster field and a shorter or longer race. Not a separate mode — the same
-     race, dialled. */
+  /* FACILE NON VUOL DIRE "AVVERSARI ASSENTI". La prima taratura rendeva tutto
+     il campo piu lento del giocatore, e il risultato misurato era che per il
+     92% della gara non avevi nessuno davanti: restavi solo su una strada
+     vuota, che e' esattamente la cosa che rendeva il gioco noioso. Adesso il
+     gruppo ti sta intorno in tutte e due, e la difficolta e' QUANTI di loro
+     sono piu veloci di te e di quanto — non se ci sono. */
   var DIFF = [
-    { id: 0, name: 'Facile', sub: '2 giri', laps: 2, rivalScale: 0.86, color: '#38d9a9' },
-    { id: 1, name: 'Corsa', sub: '3 giri', laps: 3, rivalScale: 1.0, color: '#e8536b' }
+    { id: 0, name: 'Facile', sub: '2 giri', laps: 2, rivalScale: 0.97, color: '#38d9a9' },
+    { id: 1, name: 'Corsa', sub: '3 giri', laps: 3, rivalScale: 1.04, color: '#e8536b' }
   ];
   G.kartDiff = function () { return DIFF[br().diff] || DIFF[0]; };
 

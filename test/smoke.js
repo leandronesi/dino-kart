@@ -340,6 +340,14 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
   pump(60);
   if (G.kartState().spd !== 0) fail("il kart si muove durante il conto alla rovescia");
 
+  /* SULLA GRIGLIA SI DEVONO VEDERE GLI AVVERSARI. "Manca la griglia iniziale in
+     cui VEDI gli avversari": mancava perche' partivano DIETRO di me, e un
+     renderer a segmenti disegna solo quello che sta davanti. Erano invisibili
+     per costruzione, e nessun collaudo numerico poteva accorgersene. */
+  if (G.kartAhead().n < 3) {
+    fail("sulla griglia vedo solo " + G.kartAhead().n + " avversari davanti: la partenza e vuota");
+  }
+
   pump(180);                                   // ~4s: il semaforo dura 3,3
   if (G.kartState().phase !== "gara") fail("il semaforo non finisce mai: fase \"" + G.kartState().phase + "\"");
 
@@ -403,11 +411,12 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
 
   if (G.kartState().boxes < 20) fail("quasi nessuna cassa premio sulla pista: " + G.kartState().boxes);
 
-  let offFrames = 0, ran = 0, maxLap = 1, badPlace = 0;
+  let offFrames = 0, ran = 0, maxLap = 1, badPlace = 0, withSomeone = 0;
   for (ran = 0; ran < 14000; ran++) {
     st = G.kartState();
     if (st.phase === "fine") break;
     if (st.x > 0.34) steerTo(-1); else if (st.x < -0.34) steerTo(1); else steerTo(0);
+    if (G.kartAhead().n > 0) withSomeone++;
     if (Math.abs(st.x) >= 1) offFrames++;
     if (st.lap > maxLap) maxLap = st.lap;
     if (!(st.place >= 1 && st.place <= st.field)) badPlace++;
@@ -424,6 +433,17 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
   /* Chi guida in mezzo alla strada per due giri deve raccogliere qualcosa: le
      casse sono tre di fila apposta perche prenderne una sia quasi gratis. */
   if (st.took < 5) fail("in due giri ho preso solo " + st.took + " premi: le casse non si prendono");
+
+  /* E CI DEVE ESSERE QUALCUNO DA VEDERE. Questa e l asserzione che riassume
+     tutta la lamentela: "la cosa divertente e sparargli roba, non andare piu
+     veloce senza nessuno da vedere". Misurata, era il 3%: per il 97% della gara
+     eri in testa su una strada deserta. Non c era nessun errore da nessuna
+     parte — il campo era tutto piu lento di un pilota pulito, quindi appena
+     passavi in testa la gara finiva e continuava a girare. */
+  const withPct = Math.round(withSomeone / ran * 100);
+  if (withPct < 25) {
+    fail("per l " + (100 - withPct) + "% della gara non ho nessuno davanti: non e una gara, e una prova a cronometro");
+  }
 
   /* LA STRADA DEVE ESSERE TENIBILE. Il bug che ha reso il gioco ingiocabile
      era una forza centrifuga piu forte dello sterzo: con quella, correggendo
