@@ -74,8 +74,17 @@ function roadSpan(y) {
 
 console.log('Dino Kart — collaudo a occhio\n');
 
-const tracks = G.kartTracks();
 quiet(20);
+/* Il gioco adesso parte da "chi guida?". Qui il profilo lo faccio a mano: la
+   creazione tocco per tocco la prova gia smoke.js, e a questo collaudo serve
+   solo qualcuno alla guida per poter guardare la strada. */
+if (!G.account) {
+  const a = G.accounts.create({ name: 'Prova', color: '#57c98a', level: 2, secret: null });
+  G.accounts.login(a.id);
+  G.go('menu'); quiet(30);
+}
+
+const tracks = G.kartTracks();
 
 tracks.forEach((track, ti) => {
   const label = track.name;

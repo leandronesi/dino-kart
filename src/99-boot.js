@@ -1,10 +1,10 @@
-/* Boot: tablet niceties, then straight onto the track.
+/* Boot: tablet niceties, then "chi guida?".
 
-   Dino Kart shares the engine with Dino Giungla but not its contract. There is
-   no "who is playing" screen yet — one profile is created silently so the save,
-   the HUD and the audio have something to hang off, and the race starts. The
-   profile picker can be lifted from the other project the day two children want
-   separate lap records. */
+   Per un pezzo qui veniva creato un profilo in silenzio, perche' il gioco non
+   aveva ancora niente da ricordare. Adesso ne ha: giro migliore per pista,
+   vittorie, difficolta', colore del kart. Due bambini sullo stesso tablet
+   vogliono due elenchi di record, non uno mescolato — quindi si comincia da
+   dove si comincia in Dino Giungla, e per la stessa ragione. */
 (function () {
   'use strict';
 
@@ -46,10 +46,9 @@
 
   /* The engine came from a game whose home is a jungle. Here it is the menu, and
      without this the back button would call G.go on a scene that does not exist. */
-  G.home = function () { G.go('menu'); };
+  G.home = function () { G.go(G.account ? 'menu' : 'accesso'); };
 
-  var last = G.accounts.last(), a = last && G.accounts.byId(last);
-  if (!a) a = G.accounts.create({ name: 'Pilota', color: '#57c98a', level: 2, secret: null });
-  G.accounts.login(a.id);
-  G.start('menu');
+  /* Si passa SEMPRE dalla schermata dei piloti, anche con un profilo solo:
+     e' li' che l'altro fratello si accorge di poterne fare uno suo. */
+  G.start('accesso');
 })();

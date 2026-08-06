@@ -120,6 +120,28 @@
         onTap: function () { G.go('pista'); }
       });
 
+      /* Chi sta guidando, in alto a sinistra, e si tocca per cambiarlo. Senza
+         questo la scelta del pilota sarebbe una porta a senso unico: entri una
+         volta e il fratello non entra mai piu'. */
+      var me = G.account;
+      if (me) {
+        c.save();
+        c.fillStyle = 'rgba(14,20,34,.55)';
+        G.roundRect(c, 24, 24, 250, 74, 22); c.fill();
+        c.strokeStyle = 'rgba(255,246,224,.22)'; c.lineWidth = 2;
+        G.roundRect(c, 24, 24, 250, 74, 22); c.stroke();
+        c.fillStyle = me.color;
+        c.beginPath(); c.arc(66, 61, 22, 0, 6.2832); c.fill();
+        c.strokeStyle = 'rgba(12,20,34,.7)'; c.lineWidth = 3; c.stroke();
+        c.restore();
+        G.text(me.name, 178, 50, { ctx: c, size: 26, color: C.cream, maxWidth: 176 });
+        G.text('cambia pilota', 178, 78, { ctx: c, size: 17, color: 'rgba(255,246,224,.65)', weight: 700 });
+        G.ui.button({
+          id: 'chiguida', x: 24, y: 24, w: 250, h: 74, r: 22, ghost: true,
+          onTap: function () { G.accounts.logout(); G.go('accesso'); }
+        });
+      }
+
       if (g.races > 0) {
         G.text(g.wins + ' vittorie su ' + g.races + ' gare', W / 2, H - 26, {
           ctx: c, size: 24, color: 'rgba(255,246,224,.8)', weight: 800

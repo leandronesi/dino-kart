@@ -259,10 +259,73 @@ phase = "avvio";
 pump(20);
 if (!G.current) fail("nessuna scena attiva dopo l avvio");
 
-const expected = ["menu", "pista"];
+const expected = ["accesso", "nuovo", "segreto", "gate", "gestione", "menu", "pista"];
 const missing = expected.filter((s2) => !G.sceneOf(s2));
 if (missing.length) fail("scene mancanti: " + missing.join(", "));
-if (!G.account) fail("il boot non ha creato un profilo");
+if (G.current !== "accesso") fail("il gioco non parte da \"chi guida?\" ma da \"" + G.current + "\"");
+if (G.account) fail("all avvio risulta gia collegato qualcuno: " + G.account.name);
+
+/* IL PROFILO SI DEVE POTER FARE TOCCANDO, non solo dal codice. Nome, colore,
+   eta e tre figure segrete: e' la stessa porta d'ingresso di Dino Giungla e sta
+   sullo stesso tablet, quindi o funziona uguale o il bambino la impara due
+   volte. Qui il collaudo la percorre davvero, tocco per tocco. */
+phase = "nuovo pilota";
+tap(640, 320);                                 // la card "Nuovo pilota"
+pump(30);
+if (G.current !== "nuovo") fail("il tasto Nuovo non apre la creazione (sono in \"" + G.current + "\")");
+closeOverlayIfOpen("Rex");                     // il nome, chiesto dall overlay
+pump(4);
+tap(640 - 316 + 64, 198);                      // un colore della fila
+pump(2);
+tap(640, 652);                                 // Avanti -> eta
+pump(4);
+tap(820, 300);                                 // Grande
+pump(2);
+tap(640, 652);                                 // Avanti -> segreto
+pump(4);
+// tre figure sulla griglia 3x3: la 0, la 4 e la 8
+[[0, 0], [1, 1], [2, 2]].forEach((rc) => {
+  tap(640 - 232 + rc[1] * 154 + 69, 228 + rc[0] * 154 + 69);
+  pump(2);
+});
+tap(640, 652);                                 // Fatto!
+pump(40);
+
+if (G.current !== "menu") fail("finita la creazione non sono nel menu ma in \"" + G.current + "\"");
+if (!G.account) fail("il pilota creato non risulta collegato");
+else {
+  if (G.account.name !== "Rex") fail("il nome scelto non e stato salvato: \"" + G.account.name + "\"");
+  if (!G.account.secret || G.account.secret.length !== 3) fail("il segreto a tre figure non e stato salvato");
+  // l eta scelta deve arrivare da qualche parte, o e una domanda per finta
+  if (G.kartSave().diff !== 1) fail("ho scelto Grande ma la difficolta di partenza e Facile");
+}
+
+/* E IL SEGRETO DEVE SERVIRE A QUALCOSA. Non e sicurezza, e una serratura di
+   famiglia: deve tenere fuori il fratello che tocca a caso, e deve far entrare
+   chi si ricorda le sue tre figure. */
+phase = "segreto";
+const mine = G.account && G.account.secret ? G.account.secret.slice() : null;
+if (mine) {
+  G.accounts.logout();
+  G.go("accesso"); pump(30);
+  const NC = G.accounts.list().length + 1;
+  const CX0 = (1280 - (NC * 210 + (NC - 1) * 22)) / 2;
+  tap(CX0 + 105, 320);                         // la card del primo pilota
+  pump(30);
+  if (G.current !== "segreto") fail("un pilota col segreto entra senza che glielo si chieda");
+
+  const pad = (idx) => [690 + (idx % 3) * 162 + 74, 132 + Math.floor(idx / 3) * 162 + 74];
+  [0, 1, 2].map((k) => (mine[k] + 1) % 9).forEach((idx) => { const p = pad(idx); tap(p[0], p[1]); pump(2); });
+  pump(6);
+  if (G.account) fail("un segreto sbagliato fa entrare lo stesso");
+  if (G.current !== "segreto") fail("dopo un segreto sbagliato non sono piu sulla schermata del segreto");
+
+  mine.forEach((idx) => { const p = pad(idx); tap(p[0], p[1]); pump(2); });
+  pump(40);
+  if (!G.account) fail("il segreto giusto non fa entrare");
+  if (G.current !== "menu") fail("dopo il segreto giusto non sono nel menu ma in \"" + G.current + "\"");
+}
+if (!G.account) fail("nessun profilo collegato: il resto del collaudo non puo girare");
 
 // the road must actually draw something, and never a NaN coordinate
 phase = "pista";
@@ -547,7 +610,7 @@ if (G.sceneOf("pista")) {
     }
 
     // a mani vuote la stessa fascia deve tornare a sterzare
-    while (G.kartState().ammo) { pump(1); }
+    for (let g = 0; g < 3000 && G.kartState().ammo; g++) pump(1);
     ELS.c.dispatch("pointerdown", pev(1080, fy + 40));
     pump(2);
     if (Math.abs(G.kartState().steer) < 0.9) {

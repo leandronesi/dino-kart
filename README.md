@@ -40,6 +40,55 @@ e sterzi a sinistra. Niente altro da imparare. Il gas va da solo: chi deve
 sterzare *e* tenere premuto un acceleratore ha due lavori, e quello che conta è
 lo sterzo.
 
+Quando hai un'arma in mano — e **solo** allora — la fascia in fondo allo schermo
+diventa il tasto **TIRA!**. A mani vuote sterza come tutto il resto, quindi non
+esiste nessuna zona morta da imparare: c'è un tasto, o non c'è.
+
+## Chi guida
+
+All'avvio si passa sempre da **"Chi guida?"**, come in Dino Giungla e per la
+stessa ragione: due bambini sullo stesso tablet vogliono due elenchi di record,
+non uno mescolato. Ogni pilota ha il suo nome, il colore del suo kart, il suo
+giro migliore per pista e le sue vittorie.
+
+- **Il segreto sono tre figure**, non una password. Un bambino di tre anni non
+  sa scrivere ma ricorda benissimo "cuore, stella, luna". Non è sicurezza: è una
+  serratura di famiglia, tiene un fratello fuori dai progressi dell'altro e
+  nient'altro. Si può anche fare un pilota **senza** segreto.
+- **L'età sceglie la difficoltà di partenza** — Piccolo parte da Facile, Grande
+  da Corsa — e non apre giochi diversi. Poi si cambia dal menu quando si vuole:
+  un bambino cresce più in fretta di quanto si rifaccia un profilo.
+- Dopo tre segreti sbagliati compare **"Chiedi a un grande"**: chi ha
+  dimenticato le sue figure non deve restare chiuso fuori dal proprio gioco.
+- Dal menu, in alto a sinistra, c'è chi sta guidando: si tocca e si cambia.
+  Senza quello la scelta del pilota sarebbe una porta a senso unico.
+
+Cambiare nome, cambiare colore ed eliminare un pilota stanno dietro al
+**cancello dei grandi** (una moltiplicazione a due cifre) — non è sicurezza, è
+un attrito che un bambino di sei anni non supera per sbaglio.
+
+## Le armi
+
+Nelle casse non c'è solo la spinta. Se ne porta **una alla volta**: niente
+inventario, niente scelta, niente da spiegare. E una cassa presa con le mani già
+piene diventa turbo, così una cassa è *sempre* una buona notizia — che a tre anni
+è l'unica regola che serve sapere.
+
+| | cosa fa |
+|---|---|
+| **TURBO** | il più frequente: è l'unico che serve anche quando sei in testa |
+| **COCCO** | vola dritto, lo devi mirare |
+| **API** | inseguono da sole il primo che ti sta davanti |
+| **FULMINE** | niente proiettile: prende **tutti** quelli davanti a te in una volta |
+
+Il rallentamento del colpito si applica **dopo** la banda di recupero, non prima:
+messo prima, la banda gli avrebbe restituito quasi tutto quello che il colpo gli
+aveva tolto, e tirargli il cocco sarebbe stato un bell'effetto senza nessuna
+conseguenza.
+
+Gli avversari per ora non tirano niente: prima deve essere divertente sparare,
+poi si vedrà se è divertente essere colpiti.
+
 ## La gara
 
 Per un po' questo è stato solo un simulatore di strada: aprivi e ti trovavi già
@@ -47,26 +96,37 @@ in corsa, senza un momento in cui cominciava e senza uno in cui finiva. Adesso
 c'è la cornice, ed è quella che lo rende un gioco.
 
 - **Menu**: scegli la pista e la difficoltà, poi **VIA!**
-  - *Facile* — 2 giri, avversari all'86%
-  - *Corsa* — 3 giri, avversari al 100%
+  - *Facile* — 2 giri, campo al 97%
+  - *Corsa* — 3 giri, campo al 104%
 - **Semaforo**: tre luci, e finché sono accese il kart sta fermo.
 - **Durante**: giro, posizione, tempo sul giro e velocità. Quattro numeri, non uno
   di più — un cruscotto un bambino di sei anni non lo legge.
 - **Arrivo**: l'ordine completo dei sei kart, il tuo posto, il giro migliore
   salvato per pista, e due tasti: *Ancora!* e *Menu*.
 
-Un giro dura una ventina di secondi, una gara fra i 40 e i 60. La posizione è
-vera: conta la strada percorsa, niente aggiustamenti nascosti. Nessun avversario
-è più veloce di te a tavoletta — guidando bene si vince, guidando male si perde,
-e passando un quarto di gara sull'erba si arriva ultimi.
+Un giro dura una mezza minuto, una gara fra i 50 e gli 85 secondi. La posizione
+è vera: conta la strada percorsa, niente aggiustamenti nascosti.
+
+**Tre avversari su cinque sono più veloci di te**, e questo rovescia una regola
+che avevo scritto e difeso due volte. L'ha rovesciata un numero: col campo
+tutto più lento di un pilota pulito, la frazione di gara passata con *qualcuno
+davanti* era il **3%**. Il 97% eri in testa su una strada deserta — cioè una
+prova a cronometro, non una gara, e non c'era nessuno a cui sparare.
+
+Adesso c'è una **banda di recupero**: chi è avanti molla il gas, chi è dietro
+spinge e può sfondare il tetto della velocità massima. Chi è davanti a te però
+non lo sfonda mai, quindi non ti scappa: per passarlo servono la derapata, le
+casse e quello che gli tiri dietro. Guidare male perde lo stesso, e di brutto —
+la banda dà al massimo +24%, un kart sull'erba va al 38%.
+
+  qualcuno davanti:  3% → 63%
 
 ## Derapata e casse premio
 
 - **Casse premio**: tre in fila attraverso la strada, ogni due secondi circa.
-  Passarci dentro dà una spinta, e basta: niente inventario, niente tasto da
-  premere. Un oggetto da usare vorrebbe un dito, e i diti sono già occupati a
-  sterzare. **Le prendono anche gli avversari** — senza quello non è un
-  potenziamento, è un regalo che rende la gara una passeggiata.
+  Dentro c'è una delle quattro cose qui sopra. **Le prendono anche gli
+  avversari** — senza quello non è un potenziamento, è un +30% permanente
+  regalato al giocatore contro un campo che al massimo va a tavoletta.
 - **Derapata**: tieni il dito da un lato in curva. Le scintille passano da
   bianche a azzurre a arancioni; molli, e parti. Caricarla non costa niente che
   un bambino di tre anni non stesse già facendo — tenere premuto *è* come
@@ -77,8 +137,16 @@ e passando un quarto di gara sull'erba si arriva ultimi.
 
 | | carattere | giro |
 |---|---|---|
-| **La Collina** | prati e saliscendi, curvoni aperti su cui ti appoggi | ~19s |
-| **La Spiaggia** | stretta e nervosa: più curve, meno strada in mezzo, e una sinistra lunga in fondo | ~17s |
+| **La Collina** | prati e saliscendi, curvoni aperti su cui ti appoggi, senso orario | ~28s |
+| **La Spiaggia** | stretta e nervosa, tre esse di fila, senso antiorario | ~24s |
+
+C'è anche la **mappa in tempo reale**, in alto a sinistra: l'anello e sei
+pallini. È l'unico posto dove i cinque avversari esistono tutti insieme —
+sulla strada vedi chi hai davanti e nient'altro. Disegnarla ha scoperto una
+cosa che in prima persona non si vedeva affatto: **le prime piste non erano
+anelli**. Curve destre e sinistre si bilanciavano quasi esattamente, giro netto
+zero, il percorso se ne andava in diagonale e non tornava mai a casa. Nessuna
+scala di disegno poteva chiuderlo, perché non c'era niente da chiudere.
 
 Non è la stessa pista ridipinta: cambiano il tracciato, il cielo, i colori
 dell'asfalto e del fuoripista, e gli alberi diventano palme. Il collaudo lo
@@ -103,8 +171,8 @@ La cura non è stata alzare la centrifuga, che rende la strada intenibile, ma
 **allungare le curve**: curve corte che si alternano si annullano a vicenda,
 mentre un curvone tenuto due secondi e mezzo ti porta fuori di una strada intera
 pur restando istantaneamente più debole del volante a fondo corsa. Adesso il
-pilota passivo passa il 39% della gara sull'erba e arriva ultimo, e chi sterza
-resta pulito e vince.
+pilota passivo passa quasi tutta la gara sull'erba e arriva ultimo, e chi sterza
+resta pulito e se la gioca.
 
 `test/smoke.js` guida una gara intera **su ogni pista** senza toccare lo schermo
 e pretende di perderle tutte. Ogni asserzione del collaudo è stata verificata in
@@ -155,10 +223,11 @@ da `dg.` a `dk.`, così i due giochi non si pestano i piedi sullo stesso tablet.
 
 ```
 src/00-core.js       il motore (invariato rispetto a Dino Giungla)
-src/01-art-kart.js   il kart visto di spalle — una sola angolazione, più il lean
+src/01-art-kart.js   il kart di spalle, e le tre cose che si tirano
+src/03-profili.js    chi guida: piloti, segreto a figure, colore, cancello
 src/05-menu.js       pista, difficoltà, VIA
-src/10-pista.js      la strada pseudo-3D, la guida, gli avversari, la gara
-src/99-boot.js       avvio: profilo silenzioso e via al menu
+src/10-pista.js      la strada pseudo-3D, la guida, gli avversari, le armi, la gara
+src/99-boot.js       avvio: si comincia da "chi guida?"
 ```
 
 ```
