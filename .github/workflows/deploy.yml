@@ -26,13 +26,28 @@ jobs:
         run: |
           node build.js
           node make-icons.js
+      # SI PUBBLICANO OTTO FILE, non tutto il repo.
+      # Prima qui c'era `path: '.'`, che spediva a Pages anche src/, test/, i
+      # fotogrammi PNG del collaudo a occhio e il README — roba che nessun
+      # browser chiedera' mai, e che il sito serviva comunque. Con il collaudo
+      # a occhio che deposita immagini a ogni esecuzione l'artefatto e'
+      # cresciuto finche' `deploy-pages` ha cominciato a rispondere "Timeout
+      # reached, aborting!" due volte di fila. Il gioco e' un file solo:
+      # build.js concatena tutto src/ dentro index.html.
+      - name: Prepara il sito (solo cio che il browser chiede davvero)
+        run: |
+          mkdir -p _site
+          cp index.html sw.js manifest.webmanifest _site/
+          cp icon.svg icon-180.png icon-192.png icon-512.png icon-maskable-512.png _site/
+          ls -la _site
+          du -sh _site
       # Pages must already be switched on (Settings -> Pages -> Source:
       # GitHub Actions). `enablement: true` cannot do it for us: creating a
       # Pages site needs repo-admin rights, which GITHUB_TOKEN does not have.
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
   deploy:
     needs: build
@@ -43,3 +58,7 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # I dieci minuti di default non erano bastati due volte. Con
+          # l'artefatto ridotto non dovrebbe servire, ma costa zero.
+          timeout: 900000
