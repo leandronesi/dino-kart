@@ -35,6 +35,10 @@ function kind(c) {
   const [r, g, b] = c;
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
   if (mx - mn < 26 && r > 60 && r < 190) return 'strada';
+  // A puddle is a visible piece of the drivable ribbon, not empty sky. Without
+  // this its blue surface could hide a perfectly legible road from the pixel
+  // probe just when Crash Kart is doing its job.
+  if (r >= 60 && r <= 105 && g >= 130 && g <= 195 && b >= 175 && b <= 240) return 'strada';
   if (b > r + 25 && b > g + 10) return 'cielo';
   return 'bordo';                                    // erba, sabbia, qualunque cosa
 }

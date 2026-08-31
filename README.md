@@ -80,6 +80,7 @@ piene diventa turbo, così una cassa è *sempre* una buona notizia — che a tre
 | **COCCO** | vola dritto, lo devi mirare |
 | **API** | inseguono da sole il primo che ti sta davanti |
 | **FULMINE** | niente proiettile: prende **tutti** quelli davanti a te in una volta |
+| **BOLLA** | si accende subito attorno al kart e assorbe un urto o una pozzanghera |
 
 Il rallentamento del colpito si applica **dopo** la banda di recupero, non prima:
 messo prima, la banda gli avrebbe restituito quasi tutto quello che il colpo gli
@@ -128,7 +129,7 @@ la banda dà al massimo +24%, un kart sull'erba va al 38%.
 ## Derapata e casse premio
 
 - **Casse premio**: tre in fila attraverso la strada, ogni due secondi circa.
-  Dentro c'è una delle quattro cose qui sopra. **Le prendono anche gli
+  Dentro c'è una delle cose qui sopra. **Le prendono anche gli
   avversari** — senza quello non è un potenziamento, è un +30% permanente
   regalato al giocatore contro un campo che al massimo va a tavoletta.
 - **Derapata**: tieni il dito da un lato in curva. Le scintille passano da
@@ -136,6 +137,17 @@ la banda dà al massimo +24%, un kart sull'erba va al 38%.
   un bambino di tre anni non stesse già facendo — tenere premuto *è* come
   sterza. La bimba grande scoprirà che la tenuta lunga paga il doppio, e quello
   è il suo gioco in più.
+
+## Primo passo Crash Kart
+
+- Le **pozzanghere** azzurre si vedono da lontano: toccarle dà una piccola
+  spinta laterale e rallenta appena, senza girare il kart né rimandarlo indietro.
+- Sfiorare un altro kart è un **urto morbido**: entrambi perdono un po' di
+  slancio e si separano; nessuno può vincere semplicemente speronando.
+- La **Bolla** è difensiva e automatica: si vede sul kart, assorbe l'urto e non
+  aggiunge un tasto che possa interrompere lo sterzo.
+- Per Piccolo le pozzanghere restano laterali; per Grande alcune sono più vicine
+  alla traiettoria. Le tre difficoltà continuano a regolare il passo dei rivali.
 
 ## Le due piste
 

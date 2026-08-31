@@ -296,6 +296,9 @@
     armaFlash: 0, flash: 0,
     drift: 0,        // seconds held at full lock in a bend
     took: 0,         // boxes collected this race, for the results screen
+    shield: 0,       // auto-used bubble: one less thing for small hands to press
+    bump: 0,         // short visual wobble after a soft contact
+    impacts: 0, shieldBlocks: 0,
     order: null,
     raceT: 0,        // race clock, used to freeze an exact finish order
     finishAt: null
@@ -391,11 +394,12 @@
     turbo:   { nome: 'TURBO',   col: '#ffd75e', dice: 'Turbo!' },
     cocco:   { nome: 'COCCO',   col: '#a4703c', dice: 'Cocco!' },
     api:     { nome: 'API',     col: '#ffe066', dice: 'Le api!' },
-    fulmine: { nome: 'FULMINE', col: '#7fd7ff', dice: 'Fulmine!' }
+    fulmine: { nome: 'FULMINE', col: '#7fd7ff', dice: 'Fulmine!' },
+    scudo:   { nome: 'BOLLA',   col: '#8de9ff', dice: 'Bolla!' }
   };
   /* Pesato: il turbo esce spesso perché è quello che funziona anche quando sei
      solo in testa, e il fulmine di rado perché prende tutti in una volta. */
-  var PESI = ['turbo', 'turbo', 'turbo', 'cocco', 'cocco', 'cocco', 'api', 'api', 'fulmine'];
+  var PESI = ['turbo', 'turbo', 'turbo', 'scudo', 'scudo', 'cocco', 'cocco', 'cocco', 'api', 'api', 'fulmine'];
   var bullets = [];
 
   var boxes = [];
@@ -404,6 +408,23 @@
     var i, k;
     for (i = 80; i < segs.length - 30; i += 120) {
       for (k = -1; k <= 1; k++) boxes.push({ seg: i, x: k * 0.55, cool: 0 });
+    }
+  }
+
+  /* Puddles are the first Crash-Kart obstacle: big, slow and placed where a
+     child can see and avoid them. Piccolo gets them near the edge; Grande gets
+     a few closer to the racing line. They nudge and slow, never spin or reset. */
+  var obstacles = [];
+  function buildObstacles() {
+    obstacles.length = 0;
+    var grand = !G.account || G.account.level === 2;
+    var i, side;
+    for (i = 170; i < segs.length - 45; i += 210) {
+      side = (Math.floor(i / 210) % 2 ? 1 : -1);
+      obstacles.push({ seg: i, x: side * 0.68, cool: 0, kind: 'pozza' });
+      if (grand && (Math.floor(i / 210) % 3 === 1)) {
+        obstacles.push({ seg: i + 34, x: side * 0.34, cool: 0, kind: 'pozza' });
+      }
     }
   }
 
@@ -587,12 +608,68 @@
         var got = S.ammo ? 'turbo' : PESI[Math.floor(G.rnd(0, PESI.length)) % PESI.length];
         if (got === 'turbo') {
           S.boost = Math.max(S.boost, 1.1);
+        } else if (got === 'scudo') {
+          /* The defensive bonus is automatic. It is a bright bubble around the
+             kart, not another button that can steal the steering thumb. */
+          S.shield = Math.max(S.shield, 3.4);
+          S.armaFlash = 1.1;
+          G.sfx('chime');
+          G.fx.text(W / 2, 280, 'BOLLA!', ARMI.scudo.col, 56);
         } else {
           S.ammo = got;
           S.armaFlash = 1.1;
         }
         G.fx.burst(W / 2, H - 210, { color: ARMI[got].col, count: 12, speed: 300, lift: 160, size: 14 });
       }
+    }
+  }
+
+  function softImpact(push, label) {
+    S.bump = Math.max(S.bump, 0.34);
+    S.impacts++;
+    S.x = G.clamp(S.x + push * 0.13, -OFF_MAX, OFF_MAX);
+    if (S.shield > 0) {
+      S.shield = Math.max(0, S.shield - 0.65);
+      S.shieldBlocks++;
+      G.sfx('pop');
+      G.fx.text(W / 2, 330, 'BOLLA!', ARMI.scudo.col, 42);
+      return true;
+    }
+    /* A bump costs a little momentum, never the steering or a whole race. */
+    S.spd = Math.max(OFF_SPD, S.spd * 0.88);
+    G.sfx('hatch');
+    G.fx.text(W / 2, 330, label || 'PLOF!', C.sun, 42);
+    return false;
+  }
+
+  function updateObstacles(dt) {
+    var i, o, d;
+    for (i = 0; i < obstacles.length; i++) {
+      o = obstacles[i];
+      o.cool = Math.max(0, o.cool - dt);
+      if (o.cool > 0) continue;
+      d = wrapDelta(S.z, o.seg * SEG_LEN);
+      if (d > -SEG_LEN * 0.62 && d < SEG_LEN * 0.62 && Math.abs(S.x - o.x) < 0.30) {
+        o.cool = 1.2;
+        softImpact(S.x <= o.x ? -1 : 1, 'POZZA!');
+      }
+    }
+  }
+
+  function resolveRivalContacts(dt) {
+    var i, r, dz, push;
+    for (i = 0; i < rivals.length; i++) {
+      r = rivals[i];
+      r.impact = Math.max(0, (r.impact || 0) - dt);
+      if (r.impact > 0 || r.finishAt !== null) continue;
+      dz = wrapDelta(S.z, r.z);
+      if (Math.abs(dz) >= SEG_LEN * 0.52 || Math.abs(S.x - r.x) >= 0.36) continue;
+      r.impact = 0.65;
+      push = S.x <= r.x ? -1 : 1;
+      /* The other kart pays too: nobody gets to ram a child for free. */
+      r.spd *= S.shield > 0 ? 0.78 : 0.90;
+      r.x = G.clamp(r.x - push * 0.12, -OFF_MAX, OFF_MAX);
+      softImpact(push, 'BUM!');
     }
   }
 
@@ -728,6 +805,8 @@
       lapT: S.lapT, best: S.lapShown, trackLen: trackLen,
       steerRate: STEER_RATE, centrif: CENTRIF, maxCurve: maxCurve(),
       drift: S.drift, boost: S.boost, took: S.took, boxes: boxes.length,
+      shield: S.shield, bump: S.bump, impacts: S.impacts,
+      shieldBlocks: S.shieldBlocks, obstacles: obstacles.length,
       ammo: S.ammo, bullets: bullets.length, fireY: FIRE_Y,
       hitSpd: (function () { for (var i = 0; i < rivals.length; i++) if (rivals[i].hit > 0) return rivals[i].spd; return -1; })(),
       hits: rivals.reduce(function (a, r) { return a + (r.hit > 0 ? 1 : 0); }, 0),
@@ -763,10 +842,12 @@
       buildMap();
       buildProps(TRACKS[S.track]);
       buildBoxes();
+      buildObstacles();
       buildRivals();
       S.z = 0; S.x = 0; S.spd = 0; S.steer = 0; S.off = 0;
       S.leanShown = 0; S.boost = 0; S.dist = 0;
-      S.drift = 0; S.took = 0;
+      S.drift = 0; S.took = 0; S.shield = 0; S.bump = 0;
+      S.impacts = 0; S.shieldBlocks = 0;
       S.ammo = null; S.armaFlash = 0; S.flash = 0;
       bullets.length = 0;
       S.phase = 'via'; S.t = 0; S.lit = -1; S.raceT = 0; S.finishAt = null;
@@ -839,6 +920,8 @@
          weight. */
       S.leanShown += (S.steer * grip - S.leanShown) * Math.min(1, dt * 9);
       S.boost = Math.max(0, S.boost - dt);
+      S.shield = Math.max(0, S.shield - dt);
+      S.bump = Math.max(0, S.bump - dt * 2.6);
 
       /* LA DERAPATA. Mario Kart's mini-turbo, and the reason it belongs in a
          game aimed this young: charging it costs nothing a child was not doing
@@ -855,10 +938,12 @@
       }
 
       takeBoxes(dt);
+      updateObstacles(dt);
       updateBullets(dt);
       S.armaFlash = Math.max(0, S.armaFlash - dt);
       S.flash = Math.max(0, S.flash - dt);
       updateRivals(dt, frameStart);
+      resolveRivalContacts(dt);
       S.dist += travel;
       S.lapT += dt;
 
@@ -1017,6 +1102,7 @@
 
     drawProps(c);
     drawBoxes(c);
+    drawObstacles(c);
     drawBullets(c);
     drawRivals(c);
     drawKart(c);
@@ -1141,6 +1227,32 @@
         c.lineTo(0, sz * 0.30);
         c.lineTo(-sz * 0.24, sz * 0.06);
         c.closePath(); c.fill();
+        c.restore();
+      }
+    }
+  }
+
+  /* Blue puddles read as something to skirt around even before one is touched.
+     They use the same projected slice as crates and rivals, so they never pop
+     in front of the kart or become larger than it. */
+  function drawObstacles(c) {
+    var i, j, o, sh, x, y, rx, ry;
+    for (i = shots.length - 1; i >= 0; i--) {
+      sh = shots[i];
+      if (i < 4 || sh.w < 2) continue;
+      for (j = 0; j < obstacles.length; j++) {
+        o = obstacles[j];
+        if (o.seg !== sh.idx) continue;
+        rx = sh.sc * 220 * H / 2;
+        ry = rx * 0.34;
+        if (rx < 4) continue;
+        x = sh.x + sh.w * o.x;
+        y = sh.y - ry * 0.14;
+        c.save();
+        c.globalAlpha = o.cool > 0 ? 0.35 : 0.92;
+        c.fillStyle = '#4da7d8';
+        c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 6.2832); c.fill();
+        c.strokeStyle = '#d6f5ff'; c.lineWidth = Math.max(1, rx * 0.12); c.stroke();
         c.restore();
       }
     }
@@ -1399,8 +1511,19 @@
      instead. */
   function drawKart(c) {
     var lean = S.leanShown;
-    var bump = Math.sin(S.z * 0.004) * (S.spd / MAX_SPD) * (S.off > 0.4 ? 2.6 : 0.6);
+    var bump = Math.sin(S.z * 0.004) * (S.spd / MAX_SPD) * (S.off > 0.4 ? 2.6 : 0.6)
+      + Math.sin(G.t * 48) * S.bump * 8;
     var kx = W / 2;
+
+    if (S.shield > 0) {
+      var glow = 0.50 + 0.28 * Math.sin(G.t * 9);
+      c.save();
+      c.globalAlpha = glow;
+      c.strokeStyle = ARMI.scudo.col; c.lineWidth = 7;
+      c.fillStyle = 'rgba(95,214,255,.12)';
+      c.beginPath(); c.ellipse(kx, H - 164, 142, 150, 0, 0, 6.2832); c.fill(); c.stroke();
+      c.restore();
+    }
 
     /* The drift charge, said in colour and nothing else. There is no gauge and
        no number: white sparks, then blue, then orange, and letting go while the

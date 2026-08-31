@@ -346,6 +346,22 @@ if (G.kartRivalProfiles) {
   }
 }
 
+/* Primo passo verso Crash Kart: gli ostacoli sono presenti per entrambi, ma il
+   Piccolo ha solo pozzanghere laterali. Il Grande ne trova qualcuna piu' vicina
+   alla traiettoria, senza introdurre spin, reset o trappole inevitabili. */
+phase = "crash kart";
+if (G.account && G.sceneOf("pista")) {
+  const originalLevel = G.account.level;
+  G.account.level = 1; G.go("pista"); pump(30);
+  const littleCrash = G.kartState();
+  G.account.level = 2; G.go("pista"); pump(30);
+  const bigCrash = G.kartState();
+  G.account.level = originalLevel;
+  if (littleCrash.obstacles < 4) fail("Piccolo non trova abbastanza pozzanghere leggibili");
+  if (bigCrash.obstacles <= littleCrash.obstacles) fail("Grande non riceve gli ostacoli aggiuntivi");
+  if (littleCrash.shield !== 0 || bigCrash.shield !== 0) fail("la bolla parte attiva senza aver raccolto un premio");
+}
+
 // the road must actually draw something, and never a NaN coordinate
 phase = "pista";
 if (G.sceneOf("pista")) {
