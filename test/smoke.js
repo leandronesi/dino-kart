@@ -225,7 +225,7 @@ function toClient(x, y) {
   const v = G.view;
   return { clientX: v.ox + x * v.s, clientY: v.oy + y * v.s };
 }
-function pev(x, y) { const c = toClient(x, y); return { clientX: c.clientX, clientY: c.clientY, pointerId: 1, preventDefault: NOOP }; }
+function pev(x, y, id) { const c = toClient(x, y); return { clientX: c.clientX, clientY: c.clientY, pointerId: id || 1, preventDefault: NOOP }; }
 
 function tap(x, y) {
   ELS.c.dispatch('pointerdown', pev(x, y));
@@ -326,6 +326,25 @@ if (mine) {
   if (G.current !== "menu") fail("dopo il segreto giusto non sono nel menu ma in \"" + G.current + "\"");
 }
 if (!G.account) fail("nessun profilo collegato: il resto del collaudo non puo girare");
+
+/* Tre difficolta' sono utili solo se cambiano davvero la pressione della gara,
+   senza nascondere un avversario scarso dietro a uno forte. */
+phase = "bilanciamento";
+if (G.kartRivalProfiles) {
+  for (let diff = 0; diff < 3; diff++) {
+    const profile = G.kartRivalProfiles(diff);
+    if (profile.length !== 5) fail("difficolta " + diff + ": rivali attesi 5, trovati " + profile.length);
+    for (let i = 1; i < profile.length; i++) {
+      if (!(profile[i].skill > profile[i - 1].skill && profile[i].nominal > profile[i - 1].nominal)) {
+        fail("difficolta " + diff + ": la forza dei rivali non cresce da " + profile[i - 1].name + " a " + profile[i].name);
+      }
+    }
+  }
+  const easy = G.kartRivalProfiles(0), race = G.kartRivalProfiles(1), champs = G.kartRivalProfiles(2);
+  if (!(easy[4].nominal < race[4].nominal && race[4].nominal < champs[4].nominal)) {
+    fail("le tre difficolta non aumentano la pressione della gara");
+  }
+}
 
 // the road must actually draw something, and never a NaN coordinate
 phase = "pista";
@@ -493,6 +512,12 @@ if (G.sceneOf("menu") && G.sceneOf("pista")) {
   if (badPlace) fail("posizione fuori dal gruppo in " + badPlace + " frame");
   if (st.order !== 6) fail("l ordine d arrivo non ha 6 kart ma " + st.order);
   if (!(st.place >= 1 && st.place <= 6)) fail("posizione finale assurda: " + st.place);
+  const finishDist = st.laps * st.trackLen;
+  if (st.rivalDists.some((d) => d > finishDist + 0.01)) fail("un rivale continua oltre il traguardo");
+  for (let i = 1; i < st.orderTimes.length; i++) {
+    const before = st.orderTimes[i - 1], after = st.orderTimes[i];
+    if (before !== null && after !== null && after + 1e-8 < before) fail("il podio non rispetta l ordine temporale dei traguardi");
+  }
   /* Chi guida in mezzo alla strada per due giri deve raccogliere qualcosa: le
      casse sono tre di fila apposta perche prenderne una sia quasi gratis. */
   if (st.took < 5) fail("in due giri ho preso solo " + st.took + " premi: le casse non si prendono");
@@ -573,15 +598,23 @@ if (G.sceneOf("pista")) {
   } else {
     const fy = G.kartState().fireY;
 
-    /* IL TASTO DI FUOCO NON DEVE RUBARE LO STERZO quando le mani sono vuote,
-       e deve rubarlo quando sono piene: altrimenti o non spari mai, o hai una
-       zona morta in fondo allo schermo che nessuno ti ha spiegato. */
-    ELS.c.dispatch("pointerdown", pev(1080, fy + 40));
+    /* Due pollici: quello sul volante resta attivo quando l'altro tocca TIRA.
+       Prima il fuoco azzerava lo sterzo, quindi il kart rallentava/usciva dalla
+       traiettoria proprio mentre si premeva il pulsante divertente. */
+    ELS.c.dispatch("pointerdown", pev(1080, fy - 70, 11));
+    pump(1);
+    const beforeFire = G.kartState();
+    ELS.c.dispatch("pointerdown", pev(200, fy + 40, 22));
     pump(1);
     if (G.kartState().ammo) fail("premendo sulla fascia in fondo con l'arma in mano non ho sparato");
-    if (Math.abs(G.kartState().steer) > 0.01) fail("il tasto di fuoco sterza anche: mi manda fuori strada ogni volta che sparo");
-    ELS.c.dispatch("pointerup", pev(1080, fy + 40));
+    if (G.kartState().steer < 0.9) fail("sparare interrompe lo sterzo gia tenuto");
+    if (G.kartState().spd < beforeFire.spd * 0.88) fail("sparare taglia la velocita del kart");
+    ELS.c.dispatch("pointerup", pev(200, fy + 40, 22));
     pump(1);
+    if (G.kartState().steer < 0.9) fail("rilasciare TIRA interrompe lo sterzo dell'altro pollice");
+    ELS.c.dispatch("pointerup", pev(1080, fy - 70, 11));
+    pump(1);
+    if (Math.abs(G.kartState().steer) > 0.01) fail("rilasciare il volante non ferma lo sterzo");
 
     /* Un proiettile che ha gia colpito e sparito, quindi "vola qualcosa" e
        "ha preso qualcuno" sono la stessa buona notizia: con gli avversari a un
@@ -641,7 +674,7 @@ if (G.sceneOf("pista") && G.kartTracks) {
   // e OGNI pista deve pretendere di essere guidata, non solo la prima
   for (let ti = 0; ti < tracks.length; ti++) {
     const g3 = G.kartSave();
-    g3.diff = 1;                               // Corsa: il campo piu veloce
+    g3.diff = 1;                               // Gara: il livello normale
     g3.track = ti;
     G.go("pista"); pump(30);
     pump(220);                                 // oltre il semaforo, poi mani in mano

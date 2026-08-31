@@ -56,7 +56,7 @@ giro migliore per pista e le sue vittorie.
   serratura di famiglia, tiene un fratello fuori dai progressi dell'altro e
   nient'altro. Si può anche fare un pilota **senza** segreto.
 - **L'età sceglie la difficoltà di partenza** — Piccolo parte da Facile, Grande
-  da Corsa — e non apre giochi diversi. Poi si cambia dal menu quando si vuole:
+  da Gara — e non apre giochi diversi. Poi si cambia dal menu quando si vuole:
   un bambino cresce più in fretta di quanto si rifaccia un profilo.
 - Dopo tre segreti sbagliati compare **"Chiedi a un grande"**: chi ha
   dimenticato le sue figure non deve restare chiuso fuori dal proprio gioco.
@@ -96,8 +96,9 @@ in corsa, senza un momento in cui cominciava e senza uno in cui finiva. Adesso
 c'è la cornice, ed è quella che lo rende un gioco.
 
 - **Menu**: scegli la pista e la difficoltà, poi **VIA!**
-  - *Facile* — 2 giri, campo al 97%
-  - *Corsa* — 3 giri, campo al 104%
+  - *Facile* — 2 giri, per imparare
+  - *Gara* — 3 giri, la sfida predefinita per il Grande
+  - *Campioni* — 3 giri, per quando Gara è diventata facile
 - **Semaforo**: tre luci, e finché sono accese il kart sta fermo.
 - **Durante**: giro, posizione, tempo sul giro e velocità. Quattro numeri, non uno
   di più — un cruscotto un bambino di sei anni non lo legge.
@@ -105,9 +106,12 @@ c'è la cornice, ed è quella che lo rende un gioco.
   salvato per pista, e due tasti: *Ancora!* e *Menu*.
 
 Un giro dura una mezza minuto, una gara fra i 50 e gli 85 secondi. La posizione
-è vera: conta la strada percorsa, niente aggiustamenti nascosti.
+è vera: conta la strada percorsa; il passaggio della linea è interpolato e
+congelato, quindi HUD, traguardo e podio raccontano lo stesso arrivo.
 
-**Tre avversari su cinque sono più veloci di te**, e questo rovescia una regola
+Gli avversari hanno una forza ordinata, da Pippi a Rufo; le difficoltà alzano
+insieme il loro passo senza scambiare il più scarso con il più forte. Questo
+rovescia una regola
 che avevo scritto e difeso due volte. L'ha rovesciata un numero: col campo
 tutto più lento di un pilota pulito, la frazione di gara passata con *qualcuno
 davanti* era il **3%**. Il 97% eri in testa su una strada deserta — cioè una

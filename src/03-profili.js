@@ -8,7 +8,7 @@
      - l'anteprima è il KART, non il dino di profilo. Qui il dino esiste solo di
        spalle, e mostrarlo di lato sarebbe promettere un disegno che non c'è.
      - la domanda sull'età non apre giochi diversi, sceglie la DIFFICOLTÀ di
-       partenza: Piccolo parte da Facile, Grande da Corsa. Poi si cambia dal
+       partenza: Piccolo parte da Facile, Grande da Gara. Poi si cambia dal
        menu quando si vuole.
      - niente `A.jungle` da cui pescare uno sfondo, quindi lo sfondo è lo stesso
        cielo notturno e la stessa striscia d'asfalto del menu.
@@ -150,7 +150,7 @@
         c.fillStyle = a.level === 2 ? C.berry : C.mint;
         G.roundRect(c, x + cw / 2 - 58, y + wob + 282, 116, 32, 16); c.fill();
         c.restore();
-        G.text(a.level === 2 ? 'Corsa' : 'Facile', x + cw / 2, y + wob + 299, {
+        G.text(a.level === 2 ? 'Gara' : 'Facile', x + cw / 2, y + wob + 299, {
           ctx: c, size: 21, color: '#fff'
         });
 
@@ -340,7 +340,7 @@
         /* L'eta non apre giochi diversi: sceglie da quale difficolta si parte.
            Piu onesto che inventare due modalita che poi non esistono. */
         [{ lv: 1, t: 'Piccolo', s: '3 - 4 anni', col: C.mint, d: 'Si parte da Facile: 2 giri' },
-         { lv: 2, t: 'Grande', s: '5 - 7 anni', col: C.berry, d: 'Si parte da Corsa: 3 giri' }]
+         { lv: 2, t: 'Grande', s: '5 - 7 anni', col: C.berry, d: 'Si parte da Gara: 3 giri' }]
           .forEach(function (o, k) {
             var x = W / 2 - 340 + k * 360;
             G.ui.button({

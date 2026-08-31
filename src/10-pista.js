@@ -296,7 +296,9 @@
     armaFlash: 0, flash: 0,
     drift: 0,        // seconds held at full lock in a bend
     took: 0,         // boxes collected this race, for the results screen
-    order: null
+    order: null,
+    raceT: 0,        // race clock, used to freeze an exact finish order
+    finishAt: null
   };
 
   /* SLOWER ON PURPOSE. "Per me si può anche muovere più lentamente" — and he is
@@ -435,6 +437,7 @@
     { name: 'Rufo', color: '#ff9f43', skill: 1.10 }
   ];
   var rivals = [];
+  var steerPointer = null;
 
   /* THE STARTING GRID, and it is the fix for the biggest complaint this game
      has had: "la cosa divertente è sparargli roba, non andare più veloce senza
@@ -466,16 +469,18 @@
         dist: g.z * SEG_LEN,
         x: g.x,
         spd: 0,
-        boost: 0, bcool: 0, hit: 0,
+        boost: 0, bcool: 0, hit: 0, finishAt: null,
         wob: i * 1.7
       });
     }
   }
 
-  function updateRivals(dt) {
-    var i, r, here, want, top, dxp;
+  function updateRivals(dt, frameStart) {
+    var i, r, here, want, top, dxp, goal = S.laps * trackLen;
     for (i = 0; i < rivals.length; i++) {
       r = rivals[i];
+      // A crossed finish line is a snapshot, not a place to keep accumulating.
+      if (r.finishAt !== null) continue;
       here = segAt(r.z);
 
       /* THEY TAKE THE BOXES TOO. Without this the power-ups are not a mechanic,
@@ -548,8 +553,17 @@
       r.x += G.clamp(want - r.x, -dt * 1.6, dt * 1.6);
       r.x = G.clamp(r.x, -OFF_MAX, OFF_MAX);
 
-      r.z = wrapZ(r.z + r.spd * dt);
-      r.dist += r.spd * dt;
+      var rStep = r.spd * dt;
+      if (r.dist + rStep >= goal) {
+        var part = rStep > 0 ? (goal - r.dist) / rStep : 0;
+        r.z = wrapZ(r.z + rStep * part);
+        r.dist = goal;
+        r.finishAt = frameStart + dt * G.clamp(part, 0, 1);
+        r.spd = 0;
+      } else {
+        r.z = wrapZ(r.z + rStep);
+        r.dist += rStep;
+      }
     }
   }
 
@@ -614,8 +628,9 @@
       life: 4.5,
       wob: 0
     });
+    // Speech synthesis can hitch lower-end Android devices. The flying object,
+    // sound and hit feedback already say exactly what happened.
     G.sfx('whoosh');
-    G.say(ARMI[kind].dice);
   }
 
   function nearestAhead() {
@@ -692,19 +707,33 @@
   G.kartSkills = function (a) {
     for (var i = 0; i < RIVALS.length && i < a.length; i++) RIVALS[i].skill = a[i];
   };
+  /* Read-only balance data for the smoke test and for tuning. Nominal speed is
+     deliberately monotonic: the fifth rival is never secretly weaker than the
+     first before track position, boxes and hits enter the race. */
+  G.kartRivalProfiles = function (diff) {
+    var scales = [0.97, 1.00, 1.04];
+    var scale = scales[diff] || scales[0];
+    return RIVALS.map(function (r) {
+      return { name: r.name, skill: r.skill, nominal: r.skill * scale };
+    });
+  };
 
   G.kartState = function () {
     return {
       x: S.x, spd: S.spd, z: S.z, steer: S.steer, off: S.off, dist: S.dist,
       phase: S.phase, lap: S.lap, laps: S.laps, place: S.place,
       field: rivals.length + 1, order: S.order ? S.order.length : 0,
+      orderNames: S.order ? S.order.map(function (o) { return o.name; }) : [],
+      orderTimes: S.order ? S.order.map(function (o) { return o.finishAt; }) : [],
       lapT: S.lapT, best: S.lapShown, trackLen: trackLen,
       steerRate: STEER_RATE, centrif: CENTRIF, maxCurve: maxCurve(),
       drift: S.drift, boost: S.boost, took: S.took, boxes: boxes.length,
       ammo: S.ammo, bullets: bullets.length, fireY: FIRE_Y,
       hitSpd: (function () { for (var i = 0; i < rivals.length; i++) if (rivals[i].hit > 0) return rivals[i].spd; return -1; })(),
       hits: rivals.reduce(function (a, r) { return a + (r.hit > 0 ? 1 : 0); }, 0),
-      farX: S.farX,
+      farX: S.farX, raceT: S.raceT, finishAt: S.finishAt,
+      rivalDists: rivals.map(function (r) { return r.dist; }),
+      rivalFinishAt: rivals.map(function (r) { return r.finishAt; }),
       maxSpd: MAX_SPD, boostMul: BOOST_MUL, drift2: DRIFT_2
     };
   };
@@ -740,9 +769,9 @@
       S.drift = 0; S.took = 0;
       S.ammo = null; S.armaFlash = 0; S.flash = 0;
       bullets.length = 0;
-      S.phase = 'via'; S.t = 0; S.lit = -1;
+      S.phase = 'via'; S.t = 0; S.lit = -1; S.raceT = 0; S.finishAt = null;
       S.lapT = 0; S.lapShown = 0; S.lap = 1; S.place = 1;
-      S.order = null; S.newBest = false;
+      S.order = null; S.newBest = false; steerPointer = null;
     },
 
     update: function (dt) {
@@ -765,6 +794,9 @@
       }
       if (S.phase === 'fine') return;
 
+      var frameStart = S.raceT;
+      S.raceT += dt;
+
       var here = segAt(S.z);
       var onRoad = Math.abs(S.x) < 1;
 
@@ -783,7 +815,9 @@
       S.spd = G.clamp(S.spd, 0, MAX_SPD * BOOST_MUL);
       S.off = onRoad ? Math.max(0, S.off - dt * 3) : Math.min(1, S.off + dt * 3);
 
-      S.z = wrapZ(S.z + S.spd * dt);
+      var distBefore = S.dist;
+      var travel = S.spd * dt;
+      S.z = wrapZ(S.z + travel);
 
       /* Steering scales with speed: standing still you cannot turn, which is
          both true and what keeps the kart from pirouetting at the start line. */
@@ -824,9 +858,17 @@
       updateBullets(dt);
       S.armaFlash = Math.max(0, S.armaFlash - dt);
       S.flash = Math.max(0, S.flash - dt);
-      updateRivals(dt);
-      S.dist += S.spd * dt;
+      updateRivals(dt, frameStart);
+      S.dist += travel;
       S.lapT += dt;
+
+      var finishDist = S.laps * trackLen;
+      if (S.dist >= finishDist) {
+        var cross = travel > 0 ? (finishDist - distBefore) / travel : 0;
+        S.z = wrapZ(S.z - (S.dist - finishDist));
+        S.dist = finishDist;
+        S.finishAt = frameStart + dt * G.clamp(cross, 0, 1);
+      }
 
       /* A lap is a distance, not a line you have to be told you crossed. */
       var lapNow = Math.floor(S.dist / trackLen) + 1;
@@ -843,7 +885,7 @@
       for (i = 0; i < rivals.length; i++) if (rivals[i].dist > S.dist) ahead++;
       S.place = ahead + 1;
 
-      if (S.dist >= S.laps * trackLen) finish();
+      if (S.finishAt !== null) finish();
     },
 
     /* IL TASTO DI FUOCO NON PUO' RUBARE LO STERZO. Sterzare occupa gia tutte e
@@ -854,15 +896,21 @@
        non esiste nessuna zona morta da imparare. */
     onDown: function (p) {
       if (S.phase !== 'gara') return;
-      if (S.ammo && p.y >= FIRE_Y) { shoot(); S.steer = 0; return; }
+      // A second thumb can fire without cancelling the thumb already steering.
+      if (S.ammo && p.y >= FIRE_Y) { shoot(); return; }
+      steerPointer = p.id;
       S.steer = p.x < W / 2 ? -1 : 1;
     },
     onMove: function (p) {
       if (S.phase !== 'gara') return;
-      if (S.ammo && p.y >= FIRE_Y) return;     // il dito e' sul tasto: non sterzo
+      if (p.id !== steerPointer) return;
       S.steer = p.x < W / 2 ? -1 : 1;
     },
-    onUp: function () { S.steer = 0; },
+    onUp: function (p) {
+      if (p.id !== steerPointer) return;
+      steerPointer = null;
+      S.steer = 0;
+    },
 
     draw: function (c) { drawAll(c); }
   });
@@ -884,13 +932,22 @@
   function finish() {
     var g = G.kartSave ? G.kartSave() : null, i;
     S.phase = 'fine'; S.t = 0;
-    /* Everyone's placing, worked out once and frozen, so the results screen
-       cannot quietly reshuffle while you read it. */
-    var all = [{ me: true, name: 'Tu', color: (G.account && G.account.color) || C.dino, dist: S.dist }];
+    /* Everyone's placing is worked out once and frozen. Crossings are timed
+       inside the frame, so a rival cannot gain an invisible extra frame after
+       the line and turn a displayed first place into a second-place podium. */
+    var all = [{ me: true, name: 'Tu', color: (G.account && G.account.color) || C.dino,
+      dist: S.dist, finishAt: S.finishAt, seq: 0 }];
     for (i = 0; i < rivals.length; i++) {
-      all.push({ me: false, name: rivals[i].name, color: rivals[i].color, dist: rivals[i].dist });
+      all.push({ me: false, name: rivals[i].name, color: rivals[i].color,
+        dist: rivals[i].dist, finishAt: rivals[i].finishAt, seq: i + 1 });
     }
-    all.sort(function (a, b) { return b.dist - a.dist; });
+    all.sort(function (a, b) {
+      var af = a.finishAt !== null, bf = b.finishAt !== null;
+      if (af && bf) return a.finishAt - b.finishAt || a.seq - b.seq;
+      if (af) return -1;
+      if (bf) return 1;
+      return b.dist - a.dist || a.seq - b.seq;
+    });
     S.order = all;
     for (i = 0; i < all.length; i++) if (all[i].me) S.place = i + 1;
 

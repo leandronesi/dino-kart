@@ -16,21 +16,19 @@
     if (!g.best || typeof g.best !== 'object') g.best = {};
     if (typeof g.wins !== 'number' || !isFinite(g.wins) || g.wins < 0) g.wins = 0;
     if (typeof g.races !== 'number' || !isFinite(g.races) || g.races < 0) g.races = 0;
-    if (g.diff !== 0 && g.diff !== 1) g.diff = 0;
+    if (g.diff !== 0 && g.diff !== 1 && g.diff !== 2) g.diff = 0;
     if (typeof g.track !== 'number' || !isFinite(g.track) || g.track < 0) g.track = 0;
     return g;
   }
   G.kartSave = br;
 
-  /* FACILE NON VUOL DIRE "AVVERSARI ASSENTI". La prima taratura rendeva tutto
-     il campo piu lento del giocatore, e il risultato misurato era che per il
-     92% della gara non avevi nessuno davanti: restavi solo su una strada
-     vuota, che e' esattamente la cosa che rendeva il gioco noioso. Adesso il
-     gruppo ti sta intorno in tutte e due, e la difficolta e' QUANTI di loro
-     sono piu veloci di te e di quanto — non se ci sono. */
+  /* FACILE NON VUOL DIRE "AVVERSARI ASSENTI". Il gruppo deve restare vicino
+     anche al primo giro: cambiano la pressione e la lunghezza della gara, non
+     il fatto di avere qualcuno da rincorrere e da colpire. */
   var DIFF = [
-    { id: 0, name: 'Facile', sub: '2 giri', laps: 2, rivalScale: 0.97, color: '#38d9a9' },
-    { id: 1, name: 'Corsa', sub: '3 giri', laps: 3, rivalScale: 1.04, color: '#e8536b' }
+    { id: 0, name: 'Facile', sub: '2 giri · per iniziare', laps: 2, rivalScale: 0.97, color: '#38d9a9' },
+    { id: 1, name: 'Gara', sub: '3 giri · sfida giusta', laps: 3, rivalScale: 1.00, color: '#4d80e4' },
+    { id: 2, name: 'Campioni', sub: '3 giri · super sfida', laps: 3, rivalScale: 1.04, color: '#e8536b' }
   ];
   G.kartDiff = function () { return DIFF[br().diff] || DIFF[0]; };
 
@@ -104,9 +102,9 @@
       // difficulty
       for (i = 0; i < DIFF.length; i++) {
         (function (idx) {
-          var d = DIFF[idx], bx = W / 2 - 316 + idx * 332, on = g.diff === idx;
+          var d = DIFF[idx], dw = 292, gap = 18, bx = (W - (DIFF.length * dw + (DIFF.length - 1) * gap)) / 2 + idx * (dw + gap), on = g.diff === idx;
           G.ui.button({
-            id: 'dif' + idx, x: bx, y: 368, w: 300, h: 112, r: 26,
+            id: 'dif' + idx, x: bx, y: 368, w: dw, h: 112, r: 26,
             color: on ? d.color : 'rgba(255,246,224,.22)',
             label: d.name, sub: d.sub, fontSize: 36,
             onTap: function () { g.diff = idx; G.saveNow(); G.sfx('pop'); }

@@ -680,6 +680,7 @@
     if (G.overlayOpen()) return;
     G.resumeAudio();
     var p = toLogical(e.clientX, e.clientY);
+    p.id = e.pointerId;
     pointer.x = p.x; pointer.y = p.y; pointer.down = true; pointer.id = e.pointerId;
     if (fade.dir !== 0) return;
     var hit = hitTest(p);
@@ -694,6 +695,7 @@
   function onMove(e) {
     if (G.overlayOpen()) return;
     var p = toLogical(e.clientX, e.clientY);
+    p.id = e.pointerId;
     pointer.x = p.x; pointer.y = p.y;
     if (!pointer.down) return;
     if (gearHold > 0) {
@@ -711,6 +713,7 @@
   function onUp(e) {
     if (G.overlayOpen()) return;
     var p = toLogical(e.clientX, e.clientY);
+    p.id = e.pointerId;
     pointer.x = p.x; pointer.y = p.y; pointer.down = false;
     gearHold = 0;
     if (pressedKey) {
@@ -729,7 +732,7 @@
   cv.addEventListener('pointerdown', function (e) { e.preventDefault(); cv.setPointerCapture && cv.setPointerCapture(e.pointerId); onDown(e); });
   cv.addEventListener('pointermove', function (e) { e.preventDefault(); onMove(e); });
   cv.addEventListener('pointerup', function (e) { e.preventDefault(); onUp(e); });
-  cv.addEventListener('pointercancel', function (e) { pointer.down = false; pressedKey = null; gearHold = 0; if (cur && cur.onUp) cur.onUp({ x: pointer.x, y: pointer.y }); });
+  cv.addEventListener('pointercancel', function (e) { pointer.down = false; pressedKey = null; gearHold = 0; if (cur && cur.onUp) cur.onUp({ x: pointer.x, y: pointer.y, id: e.pointerId }); });
   cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   window.addEventListener('blur', function () { pointer.down = false; pressedKey = null; gearHold = 0; });
 
