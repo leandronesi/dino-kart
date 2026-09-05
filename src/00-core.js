@@ -45,7 +45,7 @@
 
   function resize() {
     var cw = window.innerWidth, ch = window.innerHeight;
-    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.5, 1440 / Math.max(window.innerWidth, window.innerHeight));
     view.dpr = dpr;
     view.s = Math.min(cw / W, ch / H);
     view.ox = (cw - W * view.s) / 2;
@@ -261,6 +261,7 @@
     login: function (id) {
       var a = G.accounts.byId(id);
       if (!a) return false;
+      if (G.account) writeSave();
       G.account = a;
       G.profile = a.id;
       G.level = a.level;

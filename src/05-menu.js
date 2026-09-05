@@ -16,7 +16,7 @@
     if (!g.best || typeof g.best !== 'object') g.best = {};
     if (typeof g.wins !== 'number' || !isFinite(g.wins) || g.wins < 0) g.wins = 0;
     if (typeof g.races !== 'number' || !isFinite(g.races) || g.races < 0) g.races = 0;
-    if (g.diff !== 0 && g.diff !== 1 && g.diff !== 2) g.diff = 0;
+    if (g.diff !== 0 && g.diff !== 1 && g.diff !== 2) g.diff = G.level === 2 ? 1 : 0;
     if (typeof g.track !== 'number' || !isFinite(g.track) || g.track < 0) g.track = 0;
     return g;
   }
@@ -140,6 +140,7 @@
         });
       }
 
+      if(!matchMedia('(pointer: coarse)').matches)G.text('? ? sterza     SPAZIO lancia',640,655,{size:24,color:C.cream});
       if (g.races > 0) {
         G.text(g.wins + ' vittorie su ' + g.races + ' gare', W / 2, H - 26, {
           ctx: c, size: 24, color: 'rgba(255,246,224,.8)', weight: 800

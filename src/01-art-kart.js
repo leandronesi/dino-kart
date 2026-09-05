@@ -81,6 +81,22 @@
     c.closePath();
     _shape(c, col, lw);
 
+    // Each friend has a distinct silhouette and livery, even without reading.
+    if (o.style !== undefined) {
+      c.fillStyle = '#fff5dc';
+      if (o.style === 0) { // twin racing stripes
+        c.fillRect(-w*.16,-h*.78,w*.08,h*.55); c.fillRect(w*.08,-h*.78,w*.08,h*.55);
+      } else if (o.style === 1) { // broad spoiler
+        c.fillStyle = '#253f75'; G.roundRect(c,-w*.48,-h*.93,w*.96,h*.15,h*.05); c.fill();
+      } else if (o.style === 2) { // spotted shell
+        for(var spot=0;spot<3;spot++){_ell(c,(spot-1)*w*.19,-h*.5,w*.07,w*.07,0);c.fill();}
+      } else if (o.style === 3) { // pennant
+        c.strokeStyle=INK;c.lineWidth=lw;c.beginPath();c.moveTo(w*.35,-h*.4);c.lineTo(w*.35,-h*1.8);c.stroke();
+        c.fillStyle='#ffeb85';c.beginPath();c.moveTo(w*.35,-h*1.8);c.lineTo(w*.65,-h*1.6);c.lineTo(w*.35,-h*1.4);c.fill();
+      } else { // rugged rear bumper
+        c.fillStyle='#85452c';G.roundRect(c,-w*.46,-h*.35,w*.92,h*.19,h*.06);c.fill();
+      }
+    }
     // a lighter panel, so the shell is not a flat blob
     c.save();
     c.globalAlpha = 0.35;

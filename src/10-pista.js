@@ -72,7 +72,7 @@
       sky: ['#7fc6e8', '#cfeafc'],
       prop: 'albero',
       col: {
-        grassLight: '#57ad45', grassDark: '#3d7c30',
+        grassLight: '#78af59', grassDark: '#6ba451',
         roadLight: '#787d86', roadDark: '#5a5e66',
         rumbleLight: '#e8536b', rumbleDark: '#fff6e0',
         laneMark: '#fff6e0'
@@ -290,7 +290,7 @@
     phase: 'via',    // 'via' = countdown | 'gara' | 'fine'
     t: 0,            // seconds in the current phase
     lapT: 0, best: 0, lapShown: 0,
-    place: 1, laps: 3, lap: 1, lit: -1, newBest: false, farX: 640,
+    place: 6, laps: 3, lap: 1, lit: -1, newBest: false, farX: 640,
     rivalScale: 1,
     ammo: null,      // l arma che porto, una sola
     armaFlash: 0, flash: 0,
@@ -346,9 +346,9 @@
      reason a corner feels fast: with an empty verge, a road that scrolls at
      12000 units a second and one that scrolls at 4000 look nearly identical.
      Placed once per track, at a fixed side offset. */
-  var props = [];
+  var props = [], propsBySegment = [];
   function buildProps(t) {
-    props.length = 0;
+    props.length = 0; propsBySegment = [];
     var i, n = Math.floor(segs.length / 4);
     for (i = 0; i < n; i++) {
       var si = i * 4 + (i % 3);
@@ -360,6 +360,7 @@
         kind: (i % 5 === 0) ? 'cartello' : (t.prop || 'albero'),
         h: 900 + ((i * 53) % 7) * 130
       });
+      (propsBySegment[si] || (propsBySegment[si] = [])).push(props[props.length - 1]);
     }
   }
 
@@ -458,7 +459,20 @@
     { name: 'Rufo', color: '#ff9f43', skill: 1.10 }
   ];
   var rivals = [];
-  var steerPointer = null;
+  var steerPointer = null, touchSteer = 0, keys = {left:false,right:false};
+  function applySteering(){S.steer=keys.left||keys.right?(Number(keys.right)-Number(keys.left)):touchSteer;}
+  function clearSteering(){keys.left=keys.right=false;touchSteer=0;steerPointer=null;S.steer=0;}
+  window.addEventListener('keydown',function(e){
+    if(G.current!=='pista'||S.phase==='fine'||(G.overlayOpen&&G.overlayOpen()))return;
+    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();keys[e.key==='ArrowLeft'?'left':'right']=true;applySteering();}
+    if(e.code==='Space'||e.key===' '){e.preventDefault();if(!e.repeat&&S.phase==='gara')shoot();}
+  });
+  window.addEventListener('keyup',function(e){
+    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){keys[e.key==='ArrowLeft'?'left':'right']=false;if(G.current==='pista'){e.preventDefault();applySteering();}}
+    if(G.current==='pista'&&(e.code==='Space'||e.key===' '))e.preventDefault();
+  });
+  window.addEventListener('blur',clearSteering);
+  document.addEventListener('visibilitychange',function(){if(document.hidden)clearSteering();});
 
   /* THE STARTING GRID, and it is the fix for the biggest complaint this game
      has had: "la cosa divertente è sparargli roba, non andare più veloce senza
@@ -481,7 +495,7 @@
       var r = RIVALS[i];
       var g = GRID[i] || { z: 2, x: 0 };
       rivals.push({
-        name: r.name, color: r.color, skill: r.skill,
+        name: r.name, color: r.color, skill: r.skill, style: i,
         /* dist counts as raced from the very start line, grid slot included, so
            the board reads 6/6 on the lights — you ARE last, you are at the back
            of the grid — and it goes on telling the truth from there. The head
@@ -563,7 +577,8 @@
       /* Aim for the inside of the bend: on a right-hander the fast line is to
          the right. Wander a little so five karts are not one kart drawn five
          times. */
-      want = here.curve * 0.11 + Math.sin(G.t * 0.6 + r.wob) * 0.18;
+      want = here.curve * [0.16, 0.08, 0.12, 0.05, 0.20][r.style]
+        + Math.sin(G.t * [0.45, 0.7, 0.35, 0.9, 0.55][r.style] + r.wob) * [0.12, 0.24, 0.10, 0.30, 0.16][r.style];
       want = G.clamp(want, -0.82, 0.82);
 
       // give the player room rather than shunting him: they are opponents, not obstacles
@@ -851,8 +866,8 @@
       S.ammo = null; S.armaFlash = 0; S.flash = 0;
       bullets.length = 0;
       S.phase = 'via'; S.t = 0; S.lit = -1; S.raceT = 0; S.finishAt = null;
-      S.lapT = 0; S.lapShown = 0; S.lap = 1; S.place = 1;
-      S.order = null; S.newBest = false; steerPointer = null;
+      S.lapT = 0; S.lapShown = 0; S.lap = 1; S.place = RIVALS.length + 1;
+      S.order = null; S.newBest = false; clearSteering();
     },
 
     update: function (dt) {
@@ -984,19 +999,20 @@
       // A second thumb can fire without cancelling the thumb already steering.
       if (S.ammo && p.y >= FIRE_Y) { shoot(); return; }
       steerPointer = p.id;
-      S.steer = p.x < W / 2 ? -1 : 1;
+      touchSteer = p.x < W / 2 ? -1 : 1; applySteering();
     },
     onMove: function (p) {
       if (S.phase !== 'gara') return;
       if (p.id !== steerPointer) return;
-      S.steer = p.x < W / 2 ? -1 : 1;
+      touchSteer = p.x < W / 2 ? -1 : 1; applySteering();
     },
     onUp: function (p) {
       if (p.id !== steerPointer) return;
       steerPointer = null;
-      S.steer = 0;
+      touchSteer = 0; applySteering();
     },
 
+    exit: clearSteering,
     draw: function (c) { drawAll(c); }
   });
 
@@ -1056,7 +1072,8 @@
   function drawAll(c) {
     var t = TRACKS[S.track];
     var base = segAt(S.z);
-    var camY = base.y + CAM_H;
+    var fraction = wrapZ(S.z) / SEG_LEN % 1;
+    var camY = G.lerp(base.y, segAt(S.z + SEG_LEN).y, fraction) + CAM_H;
     var camZ = S.z;
 
     drawSky(c, t);
@@ -1067,7 +1084,7 @@
        segment landed; then the roadside objects painted over it in the same
        order, so a tree can never be swallowed by the tarmac drawn after it. */
     var base0 = Math.floor(wrapZ(S.z) / SEG_LEN);
-    var cx = 0, dx = 0, i, s, prev = null, maxy = H, drawn = 0;
+    var cx = 0, dx = -base.curve * fraction, i, s, prev = null, maxy = H, drawn = 0;
     shots.length = 0;
     for (i = 0; i < DRAW_N; i++) {
       s = segs[(base0 + i) % segs.length];
@@ -1118,6 +1135,9 @@
     g.addColorStop(1, t.sky[1]);
     c.fillStyle = g;
     c.fillRect(0, 0, W, HORIZON + 60);
+    c.fillStyle = t.id==='collina'?'#76a779':'#d4bb87';
+    c.beginPath();c.moveTo(0,HORIZON);c.bezierCurveTo(150,165,280,182,450,HORIZON);c.bezierCurveTo(760,155,1010,190,W,HORIZON);c.closePath();c.fill();
+    c.fillStyle='rgba(255,250,228,.65)';for(var cloud=0;cloud<3;cloud++){c.beginPath();c.ellipse(260+cloud*350,180-cloud%2*60,70,18,0,0,7);c.fill();}
     c.fillStyle = COL.grassDark;
     c.fillRect(0, HORIZON, W, H - HORIZON);
   }
@@ -1148,8 +1168,9 @@
     for (i = shots.length - 1; i >= 0; i--) {
       sh = shots[i];
       if (i < 3 || sh.w < 2) continue;      // see drawBoxes: nothing nearer than the kart
-      for (var j = 0; j < props.length; j++) {
-        p = props[j];
+      var localProps = propsBySegment[sh.idx] || [];
+      for (var j = 0; j < localProps.length; j++) {
+        p = localProps[j];
         if (p.seg !== sh.idx) continue;
         x = sh.x + sh.w * p.x;
         h = sh.sc * p.h * H / 2;
@@ -1160,10 +1181,8 @@
           c.fillRect(x - w * 0.08, sh.y - h * 0.34, w * 0.16, h * 0.34);
           c.fillStyle = '#2f7a3a';
           c.beginPath();
-          c.moveTo(x, sh.y - h);
-          c.lineTo(x + w * 0.5, sh.y - h * 0.30);
-          c.lineTo(x - w * 0.5, sh.y - h * 0.30);
-          c.closePath(); c.fill();
+          c.ellipse(x,sh.y-h*.62,w*.48,h*.38,0,0,7);c.fill();
+          c.fillStyle='#4b9957';c.beginPath();c.ellipse(x-w*.14,sh.y-h*.76,w*.26,h*.21,-.2,0,7);c.fill();
         } else if (p.kind === 'palma') {
           /* A bare trunk with a crown of fronds. Drawn with the same two
              primitives as the pine, so the beach costs nothing extra. */
@@ -1291,7 +1310,7 @@
       sh = shots[i];
       for (j = 0; j < rivals.length; j++) {
         r = rivals[j];
-        di = Math.round(wrapDelta(S.z, r.z) / SEG_LEN);
+        di = Math.floor((wrapZ(S.z) % SEG_LEN + CAM_BACK + wrapDelta(S.z, r.z)) / SEG_LEN);
         if (di !== i || di < 1) continue;         // behind us, or not this slice
         /* ONE rule for every kart on screen, mine included. The player is drawn
            at a fixed 210px because the camera sits a fixed CAM_BACK behind him;
@@ -1300,12 +1319,17 @@
            different rules that never agreed — a rival ten segments ahead came out
            462px against my 210, so the thing in the distance was twice the size
            of the thing in my hands. */
-        var dd = di * SEG_LEN;
+        var dd = wrapDelta(S.z, r.z);
+        var blend = (wrapZ(S.z) % SEG_LEN + CAM_BACK + dd) / SEG_LEN - di;
+        var nextShot = shots[i + 1] || sh;
+        var roadX = G.lerp(sh.x, nextShot.x, blend);
+        var roadY = G.lerp(sh.y, nextShot.y, blend);
+        var roadW = G.lerp(sh.w, nextShot.w, blend);
         sz = (CAM_D / (CAM_BACK + dd)) * KART_W * W / 2;
         if (sz < 5) continue;
-        x = sh.x + sh.w * r.x;
-        A.kartBack(c, x, sh.y, sz, {
-          color: r.color,
+        x = roadX + roadW * r.x;
+        A.kartBack(c, x, roadY, sz, {
+          color: r.color, style: r.style,
           lean: r.hit > 0 ? Math.sin(G.t * 22 + j) * 0.95 : G.clamp(segAt(r.z).curve * 0.12, -1, 1),
           bob: r.hit > 0 ? Math.sin(G.t * 30 + j) * 3 : 0,
           boost: r.boost > 0 ? Math.min(0.85, r.boost) : 0
