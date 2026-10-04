@@ -26,6 +26,7 @@ jobs:
         run: |
           node build.js
           node make-icons.js
+          node test/smoke.js
       # SI PUBBLICANO OTTO FILE, non tutto il repo.
       # Prima qui c'era `path: '.'`, che spediva a Pages anche src/, test/, i
       # fotogrammi PNG del collaudo a occhio e il README — roba che nessun

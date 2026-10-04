@@ -733,7 +733,7 @@
   cv.addEventListener('pointerdown', function (e) { e.preventDefault(); cv.setPointerCapture && cv.setPointerCapture(e.pointerId); onDown(e); });
   cv.addEventListener('pointermove', function (e) { e.preventDefault(); onMove(e); });
   cv.addEventListener('pointerup', function (e) { e.preventDefault(); onUp(e); });
-  cv.addEventListener('pointercancel', function (e) { pointer.down = false; pressedKey = null; gearHold = 0; if (cur && cur.onUp) cur.onUp({ x: pointer.x, y: pointer.y, id: e.pointerId }); });
+  cv.addEventListener('pointercancel', function (e) { pointer.down = false; pressedKey = null; gearHold = 0; if (cur && cur.onCancel) cur.onCancel(); else if (cur && cur.onUp) cur.onUp({ x: pointer.x, y: pointer.y, id: e.pointerId }); });
   cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   window.addEventListener('blur', function () { pointer.down = false; pressedKey = null; gearHold = 0; });
 

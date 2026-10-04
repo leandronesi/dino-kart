@@ -1,7 +1,7 @@
 {
   "name": "Dino Kart",
   "short_name": "Dino Kart",
-  "description": "Una gara di kart in prima persona: piste, avversari e potenziamenti.",
+  "description": "Kart in 3D: otto piste, derapate, armi e Gran Premio con il podio.",
   "lang": "it",
   "dir": "ltr",
   "start_url": "./",

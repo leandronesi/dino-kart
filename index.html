@@ -820,7 +820,7 @@ html, body {
   cv.addEventListener('pointerdown', function (e) { e.preventDefault(); cv.setPointerCapture && cv.setPointerCapture(e.pointerId); onDown(e); });
   cv.addEventListener('pointermove', function (e) { e.preventDefault(); onMove(e); });
   cv.addEventListener('pointerup', function (e) { e.preventDefault(); onUp(e); });
-  cv.addEventListener('pointercancel', function (e) { pointer.down = false; pressedKey = null; gearHold = 0; if (cur && cur.onUp) cur.onUp({ x: pointer.x, y: pointer.y, id: e.pointerId }); });
+  cv.addEventListener('pointercancel', function (e) { pointer.down = false; pressedKey = null; gearHold = 0; if (cur && cur.onCancel) cur.onCancel(); else if (cur && cur.onUp) cur.onUp({ x: pointer.x, y: pointer.y, id: e.pointerId }); });
   cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   window.addEventListener('blur', function () { pointer.down = false; pressedKey = null; gearHold = 0; });
 
@@ -905,279 +905,6 @@ html, body {
     if (cur && cur.enter) cur.enter(params || null);
     fade.a = 1; fade.dir = -1;
   };
-})();
-
-
-/* ==================== 01-art-kart.js ==================== */
-/* Dino Kart — the kart seen from behind (namespace `A`).
-
-   THE ONE ANGLE. In Dino Giungla the dino is drawn in profile, and that is fine
-   because everything there is seen from the side or from above. A racer looks
-   down the road, so we need him from behind — and from behind ONLY. Turning a
-   drawn character through 360 degrees means drawing it from eight angles, which
-   would be by a distance the most expensive art either project has been asked
-   for. Here the whole kart leans and squashes instead: one drawing, plus a lean
-   term, reads as a kart that turns. That is the trick that makes this project
-   affordable at all.
-
-   (x, y) is where the kart meets the road: the contact point, like everywhere
-   else in these two games. `s` is the width of the kart in screen pixels, so
-   the caller can scale it by distance for the rivals and never think about it
-   again.
-
-   o = { color, lean: -1..1, bob: 0..1, hat: id|null, boost: 0..1 } */
-(function () {
-  'use strict';
-
-  var G = window.G || {};
-  var C = G.C || {};
-  var A = window.A || (window.A = {});
-  var INK = C.ink || '#2b1d12';
-  var TAU = 6.2831853;
-
-  function _shade(col, amt) { return G.shade ? G.shade(col, amt) : col; }
-  function _lw(s) { return Math.max(1.4, Math.min(6, s * 0.028)); }
-  function _ell(c, x, y, rx, ry, rot) {
-    rx = Math.max(0.2, rx); ry = Math.max(0.2, ry); rot = rot || 0;
-    c.beginPath();
-    c.moveTo(x + rx * Math.cos(rot), y + rx * Math.sin(rot));
-    c.ellipse(x, y, rx, ry, rot, 0, TAU);
-  }
-  function _shape(c, col, lw) {
-    c.lineJoin = 'round'; c.lineCap = 'round';
-    if (lw > 0) { c.strokeStyle = INK; c.lineWidth = lw * 2; c.stroke(); }
-    c.fillStyle = col; c.fill();
-  }
-
-  A.kartBack = function (c, x, y, s, o) {
-    o = o || {};
-    var col = o.color || C.dino || '#57c98a';
-    var lean = Math.max(-1, Math.min(1, o.lean || 0));
-    var bob = (o.bob || 0) * s * 0.012;
-    var lw = _lw(s);
-    var w = s, h = s * 0.56;
-
-    c.save();
-    c.translate(x, y + bob);
-    /* The lean is doing all the work of a turn: the body rolls, and the whole
-       thing shifts a little into the corner. Small numbers on purpose — past
-       about eight degrees it reads as falling over rather than cornering. */
-    c.rotate(lean * 0.14);
-    c.translate(lean * s * 0.05, 0);
-
-    // ground shadow, drawn unrotated-ish so it stays flat on the road
-    c.save();
-    c.globalAlpha = 0.26; c.fillStyle = '#1a1206';
-    _ell(c, 0, 4, w * 0.56, h * 0.16, 0); c.fill();
-    c.restore();
-
-    // rear wheels: fat, and the only thing that says "this is behind you"
-    var ww = w * 0.24, wh = h * 0.52;
-    [-1, 1].forEach(function (sd) {
-      c.beginPath();
-      G.roundRect(c, sd * w * 0.5 - (sd > 0 ? 0 : ww), -wh, ww, wh, ww * 0.28);
-      _shape(c, '#2f2a30', lw);
-      c.fillStyle = '#8d8a92';
-      c.beginPath();
-      c.arc(sd * (w * 0.5 - ww * 0.5) - (sd > 0 ? 0 : 0), -wh * 0.5, ww * 0.20, 0, TAU);
-      c.fill();
-    });
-
-    // the shell: a rounded box, wider at the bottom
-    c.beginPath();
-    c.moveTo(-w * 0.40, -h * 0.10);
-    c.lineTo(-w * 0.34, -h * 0.86);
-    c.lineTo(w * 0.34, -h * 0.86);
-    c.lineTo(w * 0.40, -h * 0.10);
-    c.closePath();
-    _shape(c, col, lw);
-
-    // Each friend has a distinct silhouette and livery, even without reading.
-    if (o.style !== undefined) {
-      c.fillStyle = '#fff5dc';
-      if (o.style === 0) { // twin racing stripes
-        c.fillRect(-w*.16,-h*.78,w*.08,h*.55); c.fillRect(w*.08,-h*.78,w*.08,h*.55);
-      } else if (o.style === 1) { // broad spoiler
-        c.fillStyle = '#253f75'; G.roundRect(c,-w*.48,-h*.93,w*.96,h*.15,h*.05); c.fill();
-      } else if (o.style === 2) { // spotted shell
-        for(var spot=0;spot<3;spot++){_ell(c,(spot-1)*w*.19,-h*.5,w*.07,w*.07,0);c.fill();}
-      } else if (o.style === 3) { // pennant
-        c.strokeStyle=INK;c.lineWidth=lw;c.beginPath();c.moveTo(w*.35,-h*.4);c.lineTo(w*.35,-h*1.8);c.stroke();
-        c.fillStyle='#ffeb85';c.beginPath();c.moveTo(w*.35,-h*1.8);c.lineTo(w*.65,-h*1.6);c.lineTo(w*.35,-h*1.4);c.fill();
-      } else { // rugged rear bumper
-        c.fillStyle='#85452c';G.roundRect(c,-w*.46,-h*.35,w*.92,h*.19,h*.06);c.fill();
-      }
-    }
-    // a lighter panel, so the shell is not a flat blob
-    c.save();
-    c.globalAlpha = 0.35;
-    c.beginPath();
-    c.moveTo(-w * 0.30, -h * 0.22);
-    c.lineTo(-w * 0.25, -h * 0.72);
-    c.lineTo(w * 0.02, -h * 0.72);
-    c.lineTo(w * 0.02, -h * 0.22);
-    c.closePath();
-    c.fillStyle = '#ffffff'; c.fill();
-    c.restore();
-
-    // exhausts
-    c.fillStyle = '#4a4550';
-    [-1, 1].forEach(function (sd) {
-      c.beginPath();
-      c.ellipse(sd * w * 0.22, -h * 0.14, w * 0.05, h * 0.06, 0, 0, TAU);
-      c.fill();
-    });
-    if (o.boost > 0.02) {
-      c.save();
-      c.globalAlpha = Math.min(0.85, o.boost);
-      [-1, 1].forEach(function (sd) {
-        var fg = c.createLinearGradient(0, -h * 0.14, 0, h * 0.5);
-        fg.addColorStop(0, C.sun || '#ffd75e');
-        fg.addColorStop(1, 'rgba(255,120,40,0)');
-        c.fillStyle = fg;
-        c.beginPath();
-        c.moveTo(sd * w * 0.17, -h * 0.14);
-        c.lineTo(sd * w * 0.27, -h * 0.14);
-        c.lineTo(sd * w * 0.22, h * 0.42 * (0.5 + o.boost));
-        c.closePath(); c.fill();
-      });
-      c.restore();
-    }
-
-    /* The dino, from behind. No face — that is the point, and it is why one
-       drawing is enough: the back of a head does not need to turn. */
-    var hy = -h * 1.02, hr = s * 0.17;
-
-    // shoulders rising out of the seat
-    c.beginPath();
-    _ell(c, 0, -h * 0.80, s * 0.20, s * 0.13, 0);
-    _shape(c, col, lw);
-
-    // arms reaching forward to the wheel: two stubs either side, foreshortened
-    [-1, 1].forEach(function (sd) {
-      c.beginPath();
-      G.roundRect(c, sd * s * 0.20 - (sd > 0 ? 0 : s * 0.09), -h * 0.92, s * 0.09, s * 0.15, s * 0.04);
-      _shape(c, _shade(col, -18), lw * 0.8);
-    });
-
-    // head
-    c.beginPath();
-    _ell(c, 0, hy, hr, hr * 0.94, 0);
-    _shape(c, col, lw);
-
-    // the crest, seen end-on: three spikes down the middle of the skull
-    c.beginPath();
-    [0, 1, 2].forEach(function (i) {
-      var sx = (i - 1) * hr * 0.52;
-      c.moveTo(sx - hr * 0.13, hy - hr * 0.62);
-      c.lineTo(sx, hy - hr * (i === 1 ? 1.20 : 1.00));
-      c.lineTo(sx + hr * 0.13, hy - hr * 0.62);
-      c.closePath();
-    });
-    _shape(c, _shade(col, -26), lw * 0.8);
-
-    // a sliver of cheek on each side, so the head reads as a head
-    c.save();
-    c.globalAlpha = 0.30;
-    c.fillStyle = C.pinkPop || '#ff6fae';
-    _ell(c, -hr * 0.72, hy + hr * 0.16, hr * 0.22, hr * 0.15, 0); c.fill();
-    _ell(c, hr * 0.72, hy + hr * 0.16, hr * 0.22, hr * 0.15, 0); c.fill();
-    c.restore();
-
-    /* His hat, if he is wearing one — the same eight hats as Dino Giungla when
-       that art is present, so the brand carries across. Nothing breaks if it
-       is not: the head is simply bare. */
-    if (o.hat && A.hat) {
-      c.save();
-      A.hat(c, 0, hy - hr * 0.86, hr * 1.9, o.hat);
-      c.restore();
-    }
-
-    c.restore();
-  };
-
-  /* A pill of text on a dark slab. Everything the race HUD says goes through
-     this, so the four readouts cannot drift apart in style. */
-  A.pill = function (c, x, y, w, h, label, value, col) {
-    c.save();
-    c.fillStyle = 'rgba(14,20,34,.66)';
-    G.roundRect(c, x, y, w, h, h * 0.28); c.fill();
-    c.strokeStyle = 'rgba(255,246,224,.22)'; c.lineWidth = 2;
-    G.roundRect(c, x, y, w, h, h * 0.28); c.stroke();
-    c.restore();
-    if (label) {
-      G.text(label, x + w / 2, y + h * 0.30, {
-        ctx: c, size: h * 0.24, color: 'rgba(255,246,224,.7)', weight: 800
-      });
-    }
-    G.text(String(value), x + w / 2, y + h * (label ? 0.70 : 0.52), {
-      ctx: c, size: h * (label ? 0.42 : 0.56), color: col || (C.sun || '#ffd75e')
-    });
-  };
-
-  /* Le tre cose che si tirano. Disegnate una volta e riscalate dalla distanza,
-     esattamente come i kart: quello che vola deve rimpicciolire con la strada o
-     smette di sembrare che stia sulla strada.
-
-     (x, y) è il centro dell'oggetto in volo, `s` la sua larghezza sullo
-     schermo, `ph` una fase che scorre per farlo girare e ronzare. */
-  A.arma = function (c, x, y, s, kind, ph) {
-    ph = ph || 0;
-    var lw = _lw(s * 1.6);
-    c.save();
-    c.translate(x, y);
-
-    if (kind === 'cocco') {
-      c.rotate(ph * 5);
-      c.beginPath();
-      _ell(c, 0, 0, s * 0.5, s * 0.44, 0);
-      _shape(c, '#8a5a2c', lw);
-      c.fillStyle = '#5e3a18';
-      [[-0.16, -0.10], [0.16, -0.10], [0, 0.16]].forEach(function (p) {
-        c.beginPath(); c.arc(p[0] * s, p[1] * s, s * 0.075, 0, TAU); c.fill();
-      });
-      // tre peli, perché una noce di cocco senza peli è un sasso
-      c.strokeStyle = '#6b4420'; c.lineWidth = Math.max(1, s * 0.05);
-      [-0.5, 0, 0.5].forEach(function (a) {
-        c.beginPath();
-        c.moveTo(Math.sin(a) * s * 0.3, -s * 0.38);
-        c.lineTo(Math.sin(a) * s * 0.44, -s * 0.62);
-        c.stroke();
-      });
-
-    } else if (kind === 'api') {
-      /* Uno sciame: una nuvoletta e tre api che ci girano dentro. Il movimento
-         è tutto nella fase, così lo sciame non è mai fermo. */
-      c.save();
-      c.globalAlpha = 0.16; c.fillStyle = '#fff6e0';
-      _ell(c, 0, 0, s * 0.66, s * 0.52, 0); c.fill();
-      c.restore();
-      for (var i = 0; i < 3; i++) {
-        var a = ph * 7 + i * 2.1;
-        var bx = Math.cos(a) * s * 0.34, by = Math.sin(a * 1.3) * s * 0.26;
-        c.beginPath();
-        _ell(c, bx, by, s * 0.21, s * 0.17, 0);
-        _shape(c, '#ffe066', lw * 0.7);
-        c.fillStyle = INK;
-        c.fillRect(bx - s * 0.07, by - s * 0.16, s * 0.06, s * 0.32);
-      }
-
-    } else {
-      // fulmine: una saetta, se mai dovesse volare invece di colpire subito
-      c.beginPath();
-      c.moveTo(-s * 0.18, -s * 0.5);
-      c.lineTo(s * 0.22, -s * 0.08);
-      c.lineTo(s * 0.02, -s * 0.04);
-      c.lineTo(s * 0.2, s * 0.5);
-      c.lineTo(-s * 0.22, s * 0.02);
-      c.lineTo(-s * 0.02, -s * 0.02);
-      c.closePath();
-      _shape(c, '#7fd7ff', lw);
-    }
-    c.restore();
-  };
-
-  A._kart_ok = true;
 })();
 
 
@@ -1961,2286 +1688,1224 @@ html, body {
 })();
 
 
-/* ==================== 03-profili.js ==================== */
-/* Chi sta guidando: profili, segreto a figure, colore del kart.
+/* ==================== 10-gl.js ==================== */
+/* Dino Kart — a tiny WebGL renderer, written for this game and nothing else.
 
-   Portato da Dino Giungla e non reinventato, perché i due giochi stanno sullo
-   stesso tablet e nelle stesse mani: se il modo di dire "sono io" cambia fra un
-   gioco e l'altro, il bambino deve impararlo due volte.
+   One shader: flat-shaded triangles with a colour per vertex, a sun, some
+   ambient light and distance fog that melts into the sky. That is the whole
+   low-poly look. Every model is built from boxes, cylinders, cones and
+   spheres by the mesh builder below and uploaded once.
 
-   Tre differenze, tutte dovute al fatto che questo è un gioco di corse:
-     - l'anteprima è il KART, non il dino di profilo. Qui il dino esiste solo di
-       spalle, e mostrarlo di lato sarebbe promettere un disegno che non c'è.
-     - la domanda sull'età non apre giochi diversi, sceglie la DIFFICOLTÀ di
-       partenza: Piccolo parte da Facile, Grande da Gara. Poi si cambia dal
-       menu quando si vuole.
-     - niente `A.jungle` da cui pescare uno sfondo, quindi lo sfondo è lo stesso
-       cielo notturno e la stessa striscia d'asfalto del menu.
-
-   Il segreto è tre figure, non una password: un bambino di tre anni non sa
-   scrivere ma ricorda benissimo "cuore, stella, luna". Non è sicurezza, è una
-   serratura di famiglia — tiene due fratelli fuori dai progressi l'uno
-   dell'altro, e nient'altro. */
+   The 3D picture is rendered into its own canvas and copied into the game's
+   2D canvas with drawImage, so the engine, the menus and the HUD stay exactly
+   as they are in every other Dino game. */
 (function () {
   'use strict';
 
-  var C = G.C, W = G.W, H = G.H;
-  var TAU = 6.2831853;
-
-  var COLORS = [C.dino, C.blueberry, C.pinkPop, C.tangerine, C.plum, C.water];
-
-  /* Le nove figure del segreto. Disegnate qui perché Dino Kart non porta con sé
-     la libreria di forme di Dino Giungla, e nove forme sono più economiche di
-     una dipendenza. Forma E colore insieme: un bambino che non distingue ancora
-     un rombo da un quadrato distingue benissimo l'azzurro dal blu. */
-  var KEYS = [
-    { k: 'cerchio', col: C.berry },
-    { k: 'quadrato', col: C.blueberry },
-    { k: 'triangolo', col: C.mint },
-    { k: 'cuore', col: C.pinkPop },
-    { k: 'stella', col: C.sun },
-    { k: 'fiore', col: C.plum },
-    { k: 'luna', col: C.tangerine },
-    { k: 'rombo', col: C.water },
-    { k: 'quadrato', col: C.leafLight }
-  ];
-
-  function icon(c, x, y, r, i) {
-    var s = KEYS[i % KEYS.length];
-    var j;
-    c.save();
-    c.translate(x, y);
-    c.beginPath();
-    if (s.k === 'cerchio') {
-      c.arc(0, 0, r, 0, TAU);
-    } else if (s.k === 'quadrato') {
-      G.roundRect(c, -r * 0.86, -r * 0.86, r * 1.72, r * 1.72, r * 0.24);
-    } else if (s.k === 'triangolo') {
-      c.moveTo(0, -r); c.lineTo(r * 0.92, r * 0.72); c.lineTo(-r * 0.92, r * 0.72); c.closePath();
-    } else if (s.k === 'rombo') {
-      c.moveTo(0, -r); c.lineTo(r, 0); c.lineTo(0, r); c.lineTo(-r, 0); c.closePath();
-    } else if (s.k === 'cuore') {
-      c.moveTo(0, r * 0.9);
-      c.bezierCurveTo(-r * 1.5, -r * 0.15, -r * 0.55, -r * 1.15, 0, -r * 0.34);
-      c.bezierCurveTo(r * 0.55, -r * 1.15, r * 1.5, -r * 0.15, 0, r * 0.9);
-      c.closePath();
-    } else if (s.k === 'stella') {
-      for (j = 0; j < 10; j++) {
-        var a = -Math.PI / 2 + j * Math.PI / 5;
-        var rr = j % 2 ? r * 0.46 : r;
-        if (j === 0) c.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
-        else c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-      }
-      c.closePath();
-    } else if (s.k === 'luna') {
-      c.arc(0, 0, r, Math.PI * 0.42, Math.PI * 1.58);
-      c.arc(-r * 0.42, 0, r * 0.92, Math.PI * 1.52, Math.PI * 0.48, true);
-      c.closePath();
-    } else {                                   // fiore
-      for (j = 0; j < 5; j++) {
-        var b = -Math.PI / 2 + j * TAU / 5;
-        c.moveTo(0, 0);
-        c.arc(Math.cos(b) * r * 0.52, Math.sin(b) * r * 0.52, r * 0.48, 0, TAU);
-      }
+  /* ------------------------------------------------------------ mat4 */
+  var M4 = {
+    ident: function () { return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; },
+    mul: function (a, b) {
+      var o = new Array(16);
+      for (var i = 0; i < 4; i++) for (var j = 0; j < 4; j++)
+        o[j * 4 + i] = a[i] * b[j * 4] + a[4 + i] * b[j * 4 + 1] + a[8 + i] * b[j * 4 + 2] + a[12 + i] * b[j * 4 + 3];
+      return o;
+    },
+    persp: function (fov, asp, n, f) {
+      var t = 1 / Math.tan(fov / 2);
+      return [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0];
+    },
+    look: function (e, c, u) {
+      var z = norm([e[0] - c[0], e[1] - c[1], e[2] - c[2]]), x = norm(cross(u, z)), y = cross(z, x);
+      return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1];
+    },
+    trans: function (x, y, z) { return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]; },
+    scale: function (x, y, z) { return [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]; },
+    rotY: function (a) { var c = Math.cos(a), s = Math.sin(a); return [c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]; },
+    rotX: function (a) { var c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]; },
+    rotZ: function (a) { var c = Math.cos(a), s = Math.sin(a); return [c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; },
+    apply: function (m, p) {
+      var x = p[0], y = p[1], z = p[2];
+      return [m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]];
     }
-    c.fillStyle = s.col; c.fill();
-    c.strokeStyle = 'rgba(20,14,8,.55)'; c.lineWidth = Math.max(2, r * 0.12); c.stroke();
-    c.restore();
+  };
+  function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+  function norm(a) { var l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+  function hex(c) { var v = parseInt(c.slice(1), 16); return [(v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255]; }
+
+  /* ------------------------------------------------------------ mesh builder
+     Every triangle gets its own face normal: that is what gives the crisp,
+     faceted low-poly look, and it is free. Parts are placed with a matrix
+     stack, so a kart is written as "a box here, a wheel there". */
+  function Builder() { this.v = []; this.m = M4.ident(); this.stack = []; }
+  var B = Builder.prototype;
+  B.push = function (m) { this.stack.push(this.m); this.m = M4.mul(this.m, m); return this; };
+  B.pop = function () { this.m = this.stack.pop(); return this; };
+  B.tri = function (a, b, c, col) {
+    a = M4.apply(this.m, a); b = M4.apply(this.m, b); c = M4.apply(this.m, c);
+    var n = norm(cross([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]));
+    var k = typeof col === 'string' ? hex(col) : col;
+    this.v.push(a[0], a[1], a[2], n[0], n[1], n[2], k[0], k[1], k[2], b[0], b[1], b[2], n[0], n[1], n[2], k[0], k[1], k[2], c[0], c[1], c[2], n[0], n[1], n[2], k[0], k[1], k[2]);
+    return this;
+  };
+  B.quad = function (a, b, c, d, col) { return this.tri(a, b, c, col).tri(a, c, d, col); };
+  /* box centred at (x,y,z) with full sizes (w,h,l); top and sides may differ in colour */
+  B.box = function (x, y, z, w, h, l, col, top) {
+    var a = w / 2, b = h / 2, c = l / 2, t = top || col;
+    var p = function (i, j, k) { return [x + i * a, y + j * b, z + k * c]; };
+    this.quad(p(-1, 1, -1), p(-1, 1, 1), p(1, 1, 1), p(1, 1, -1), t);       // top
+    this.quad(p(-1, -1, 1), p(-1, -1, -1), p(1, -1, -1), p(1, -1, 1), col); // bottom
+    this.quad(p(-1, -1, 1), p(1, -1, 1), p(1, 1, 1), p(-1, 1, 1), col);     // +z
+    this.quad(p(1, -1, -1), p(-1, -1, -1), p(-1, 1, -1), p(1, 1, -1), col); // -z
+    this.quad(p(1, -1, 1), p(1, -1, -1), p(1, 1, -1), p(1, 1, 1), col);     // +x
+    this.quad(p(-1, -1, -1), p(-1, -1, 1), p(-1, 1, 1), p(-1, 1, -1), col); // -x
+    return this;
+  };
+  /* cylinder along Y, radius r, height h, base at y */
+  B.cyl = function (x, y, z, r, h, col, n, r2, top) {
+    n = n || 8; r2 = r2 === undefined ? r : r2;
+    for (var i = 0; i < n; i++) {
+      var a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2;
+      var p0 = [x + Math.cos(a0) * r, y, z + Math.sin(a0) * r], p1 = [x + Math.cos(a1) * r, y, z + Math.sin(a1) * r];
+      var q0 = [x + Math.cos(a0) * r2, y + h, z + Math.sin(a0) * r2], q1 = [x + Math.cos(a1) * r2, y + h, z + Math.sin(a1) * r2];
+      this.quad(p0, q0, q1, p1, col);
+      if (r2 > 0) this.tri([x, y + h, z], q1, q0, top || col);
+      this.tri([x, y, z], p0, p1, col);
+    }
+    return this;
+  };
+  B.cone = function (x, y, z, r, h, col, n) { return this.cyl(x, y, z, r, h, col, n || 7, 0); };
+  /* a low-poly ball: lat-long with few bands */
+  B.ball = function (x, y, z, rx, ry, rz, col, bands, segs) {
+    bands = bands || 4; segs = segs || 7;
+    for (var i = 0; i < bands; i++) for (var j = 0; j < segs; j++) {
+      var t0 = i / bands * Math.PI, t1 = (i + 1) / bands * Math.PI, p0 = j / segs * Math.PI * 2, p1 = (j + 1) / segs * Math.PI * 2;
+      var P = function (t, p) { return [x + Math.sin(t) * Math.cos(p) * rx, y + Math.cos(t) * ry, z + Math.sin(t) * Math.sin(p) * rz]; };
+      if (i === 0) this.tri(P(t0, p0), P(t1, p1), P(t1, p0), col);
+      else if (i === bands - 1) this.tri(P(t0, p0), P(t0, p1), P(t1, p0), col);
+      else this.quad(P(t0, p0), P(t0, p1), P(t1, p1), P(t1, p0), col);
+    }
+    return this;
+  };
+  /* a wheel: a cylinder lying along X */
+  B.wheel = function (x, y, z, r, w, col, hub) {
+    this.push(M4.mul(M4.trans(x, y, z), M4.rotZ(Math.PI / 2)));
+    this.cyl(0, -w / 2, 0, r, w, col, 10);
+    this.cyl(0, w / 2, 0, r * .45, .02, hub || '#c9ced4', 10);
+    this.cyl(0, -w / 2 - .02, 0, r * .45, .02, hub || '#c9ced4', 10);
+    return this.pop();
+  };
+  B.count = function () { return this.v.length / 9; };
+
+  /* ------------------------------------------------------------ renderer */
+  var VS = 'attribute vec3 p;attribute vec3 n;attribute vec3 c;uniform mat4 M;uniform mat4 VP;uniform vec3 L;uniform vec3 E;varying vec3 vc;varying float vd;' +
+    'void main(){vec4 w=M*vec4(p,1.0);gl_Position=VP*w;vec3 nn=normalize(mat3(M)*n);float d=max(dot(nn,L),0.0);' +
+    'vc=c*(0.74+0.36*d);vd=distance(w.xyz,E);}';
+  var FS = 'precision mediump float;varying vec3 vc;varying float vd;uniform vec3 F;uniform vec2 FR;uniform float A;uniform vec3 T;' +
+    'void main(){float f=smoothstep(FR.x,FR.y,vd);vec3 col=vc*T;gl_FragColor=vec4(mix(col,F,f),A);}';
+
+  var R = { gl: null, canvas: null, prog: null, loc: {}, VP: null, eye: [0, 0, 0], ok: false };
+  function init() {
+    if (R.canvas) return R.ok;
+    try {
+      R.canvas = document.createElement('canvas');
+      var gl = R.gl = R.canvas.getContext('webgl', { antialias: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true });
+      if (!gl) return (R.ok = false);
+      var sh = function (t, s) { var o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; };
+      var p = R.prog = gl.createProgram();
+      gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(p); gl.useProgram(p);
+      ['p', 'n', 'c'].forEach(function (k) { R.loc[k] = gl.getAttribLocation(p, k); gl.enableVertexAttribArray(R.loc[k]); });
+      ['M', 'VP', 'L', 'E', 'F', 'FR', 'A', 'T'].forEach(function (k) { R.loc[k] = gl.getUniformLocation(p, k); });
+      gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      R.ok = true;
+    } catch (e) { R.ok = false; }
+    return R.ok;
+  }
+  function upload(b) {
+    if (!init()) return { n: b.count(), buf: null };
+    var gl = R.gl, buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(b.v), gl.STATIC_DRAW);
+    return { n: b.count(), buf: buf };
+  }
+  function free(m) { if (m && m.buf && R.gl) R.gl.deleteBuffer(m.buf); }
+  /* begin a frame: o = {w, h, eye, at, fov, sky, fog:[near, far], sun} */
+  function frame(o) {
+    if (!init()) return false;
+    var gl = R.gl;
+    if (R.canvas.width !== o.w || R.canvas.height !== o.h) { R.canvas.width = o.w; R.canvas.height = o.h; }
+    gl.viewport(0, 0, o.w, o.h);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    var V = M4.look(o.eye, o.at, [0, 1, 0]), P = M4.persp(o.fov || 1.05, o.w / o.h, .5, o.far || 700);
+    R.VP = M4.mul(P, V); R.eye = o.eye; R.w = o.w; R.h = o.h;
+    gl.uniformMatrix4fv(R.loc.VP, false, R.VP);
+    var L = norm(o.sun || [.4, .8, .3]);
+    gl.uniform3fv(R.loc.L, L); gl.uniform3fv(R.loc.E, o.eye);
+    gl.uniform3fv(R.loc.F, hex(o.sky || '#bfe6f5')); gl.uniform2fv(R.loc.FR, o.fog || [90, 320]);
+    gl.uniform1f(R.loc.A, 1); gl.uniform3fv(R.loc.T, [1, 1, 1]);
+    return true;
+  }
+  function draw(m, M, o) {
+    if (!m || !m.buf || !R.ok) return;
+    var gl = R.gl;
+    gl.uniformMatrix4fv(R.loc.M, false, M || M4.ident());
+    var a = o && o.alpha !== undefined ? o.alpha : 1;
+    gl.uniform1f(R.loc.A, a); gl.uniform3fv(R.loc.T, o && o.tint ? o.tint : [1, 1, 1]);
+    if (a < 1) { gl.enable(gl.BLEND); gl.depthMask(false); }
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.buf);
+    gl.vertexAttribPointer(R.loc.p, 3, gl.FLOAT, false, 36, 0);
+    gl.vertexAttribPointer(R.loc.n, 3, gl.FLOAT, false, 36, 12);
+    gl.vertexAttribPointer(R.loc.c, 3, gl.FLOAT, false, 36, 24);
+    gl.drawArrays(gl.TRIANGLES, 0, m.n);
+    if (a < 1) { gl.disable(gl.BLEND); gl.depthMask(true); }
+  }
+  /* world point -> logical screen point (for the 2D overlay: sparks, labels) */
+  function project(p, W, H) {
+    if (!R.VP) return null;
+    var m = R.VP, x = p[0], y = p[1], z = p[2];
+    var cx = m[0] * x + m[4] * y + m[8] * z + m[12], cy = m[1] * x + m[5] * y + m[9] * z + m[13], cw = m[3] * x + m[7] * y + m[11] * z + m[15];
+    if (cw <= .1) return null;
+    return { x: (cx / cw * .5 + .5) * W, y: (1 - (cy / cw * .5 + .5)) * H, s: 1 / cw };
   }
 
-  /* Lo sfondo: lo stesso del menu, così passare dal profilo alla gara non
-     sembra passare da un gioco a un altro. */
-  function backdrop(c, title) {
-    var sky = c.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, '#1b2740');
-    sky.addColorStop(0.55, '#3d5b86');
-    sky.addColorStop(1, '#7a9ec4');
-    c.fillStyle = sky; c.fillRect(0, 0, W, H);
-    c.fillStyle = '#5d6169'; c.fillRect(0, H - 92, W, 92);
-    c.fillStyle = '#494d55'; c.fillRect(0, H - 92, W, 8);
-    c.fillStyle = 'rgba(255,246,224,.6)';
-    for (var i = 0; i < 9; i++) c.fillRect(40 + i * 150, H - 52, 84, 10);
-    if (title) {
-      G.text(title, W / 2, 66, {
-        ctx: c, size: 54, color: C.sun, stroke: 'rgba(12,20,40,.85)', strokeWidth: 12
-      });
-    }
+  G.GL = { M4: M4, Builder: Builder, upload: upload, free: free, frame: frame, draw: draw, project: project, init: init, R: R, hex: hex };
+})();
+
+
+/* ==================== 11-models.js ==================== */
+/* Dino Kart — every model in the game, made of boxes, cylinders, cones and
+   balls. Convention: +z is forward, +y is up, the origin is on the ground in
+   the middle of the object. A kart is about 3 m long, the road about 16 m wide. */
+(function () {
+  'use strict';
+  var GL = G.GL, M4 = GL.M4;
+
+  function shade(hex, k) { var c = GL.hex(hex); return [Math.min(1, c[0] * k), Math.min(1, c[1] * k), Math.min(1, c[2] * k)]; }
+
+  /* ---- the kart, with its dino on board ---- */
+  function kart(b, col) {
+    var dark = '#2b2b33', body = col, light = shade(col, 1.25), deep = shade(col, .7);
+    b.box(0, .55, .1, 1.7, .32, 2.7, deep, body);             // chassis
+    b.box(0, .62, 1.45, 1.5, .22, .3, body, light);            // front bumper
+    b.box(-.95, .6, .1, .3, .3, 1.5, body, light);             // side pods
+    b.box(.95, .6, .1, .3, .3, 1.5, body, light);
+    b.box(0, .95, -.35, .9, .45, .9, deep, body);              // seat back / engine cover
+    b.box(0, .95, -1.1, 1.1, .4, .55, '#5a5e66', '#7b8188');   // engine
+    b.cyl(-.3, .9, -1.4, .1, .35, '#9aa0a6', 6); b.cyl(.3, .9, -1.4, .1, .35, '#9aa0a6', 6);   // exhausts
+    b.box(0, 1.0, .75, .08, .45, .08, dark);                   // steering column
+    b.push(M4.mul(M4.trans(0, 1.25, .65), M4.rotX(-.9))); b.cyl(0, 0, 0, .26, .06, dark, 10); b.pop();
+    b.box(0, .72, -1.55, 1.9, .12, .25, deep, body);           // rear wing
+    b.wheel(-1.0, .42, .95, .42, .38, dark); b.wheel(1.0, .42, .95, .42, .38, dark);
+    b.wheel(-1.05, .5, -.9, .5, .46, dark); b.wheel(1.05, .5, -.9, .5, .46, dark);
+    // the driver
+    dino(b, 0, .95, .05, .62, col);
   }
-
-  function kartPreview(c, x, y, s, color, wob) {
-    if (A.kartBack) {
-      A.kartBack(c, x, y, s, { color: color, lean: Math.sin(G.t * 1.5 + (wob || 0)) * 0.3, bob: Math.sin(G.t * 3) * 0.5 });
-      return;
-    }
-    c.fillStyle = color; c.fillRect(x - s / 2, y - s * 0.4, s, s * 0.4);
-  }
-
-  /* ------------------------------------------------------- scena: accesso */
-  G.scene('accesso', {
-    hud: false, back: false,
-
-    enter: function () {
-      var n = G.accounts.list().length;
-      setTimeout(function () {
-        if (G.current !== 'accesso') return;
-        G.say(n ? 'Chi guida oggi?' : 'Benvenuto! Facciamo il tuo pilota.');
-      }, 460);
-    },
-
-    draw: function (c) {
-      backdrop(c, 'Chi guida?');
-
-      var items = G.accounts.list().slice(0, 5);
-      var n = items.length + 1;
-      var cw = 210, gap = 22;
-      var x0 = (W - (n * cw + (n - 1) * gap)) / 2, y = 150, ch = 340;
-
-      items.forEach(function (a, i) {
-        var x = x0 + i * (cw + gap);
-        var wob = Math.sin(G.t * 1.6 + i) * 4;
-        c.save();
-        c.fillStyle = 'rgba(14,20,34,.55)';
-        G.roundRect(c, x, y + wob, cw, ch, 26); c.fill();
-        c.strokeStyle = 'rgba(255,246,224,.22)'; c.lineWidth = 2;
-        G.roundRect(c, x, y + wob, cw, ch, 26); c.stroke();
-        c.restore();
-
-        kartPreview(c, x + cw / 2, y + wob + 210, 148, a.color, i);
-        G.text(a.name, x + cw / 2, y + wob + 258, {
-          ctx: c, size: 32, color: C.cream, maxWidth: cw - 24
-        });
-
-        c.save();
-        c.fillStyle = a.level === 2 ? C.berry : C.mint;
-        G.roundRect(c, x + cw / 2 - 58, y + wob + 282, 116, 32, 16); c.fill();
-        c.restore();
-        G.text(a.level === 2 ? 'Gara' : 'Facile', x + cw / 2, y + wob + 299, {
-          ctx: c, size: 21, color: '#fff'
-        });
-
-        // il lucchetto: un puntino, non una spiegazione
-        if (a.secret) {
-          c.save(); c.globalAlpha = 0.9;
-          icon(c, x + cw - 28, y + wob + 28, 13, 4);
-          c.restore();
-        }
-
-        G.ui.button({
-          id: 'acct' + a.id, x: x, y: y + wob, w: cw, h: ch, r: 26, ghost: true,
-          onTap: function () {
-            if (a.secret) G.go('segreto', { id: a.id });
-            else { G.accounts.login(a.id); G.go('menu'); }
-          }
-        });
-      });
-
-      var xn = x0 + items.length * (cw + gap);
-      var wn = Math.sin(G.t * 1.6 + items.length) * 4;
-      G.ui.button({
-        id: 'nuovo', x: xn, y: y + wn, w: cw, h: ch, r: 26, color: C.leaf,
-        icon: function (cc, cx, cy) {
-          cc.save();
-          cc.strokeStyle = '#fff'; cc.lineWidth = 15; cc.lineCap = 'round';
-          cc.beginPath();
-          cc.moveTo(cx, cy - 92); cc.lineTo(cx, cy - 20);
-          cc.moveTo(cx - 36, cy - 56); cc.lineTo(cx + 36, cy - 56);
-          cc.stroke(); cc.restore();
-        },
-        onTap: function () { G.go('nuovo'); }
-      });
-      G.text('Nuovo', xn + cw / 2, y + wn + ch - 88, { ctx: c, size: 32, color: '#fff' });
-      G.text('pilota', xn + cw / 2, y + wn + ch - 52, { ctx: c, size: 28, color: '#fff' });
-
-      if (items.length) {
-        G.ui.round({
-          id: 'gestisci', x: W - 54, y: H - 50, r: 28, color: 'rgba(255,246,224,.5)',
-          icon: function (cc, x, yy, r) {
-            cc.save(); cc.fillStyle = C.ink;
-            for (var i = 0; i < 8; i++) {
-              var a = i * Math.PI / 4 + G.t * 0.4;
-              cc.save();
-              cc.translate(x + Math.cos(a) * r * 0.5, yy + Math.sin(a) * r * 0.5);
-              cc.rotate(a); cc.fillRect(-3, -5, 10, 10); cc.restore();
-            }
-            cc.beginPath(); cc.arc(x, yy, r * 0.32, 0, TAU); cc.fill();
-            cc.fillStyle = 'rgba(255,246,224,.9)';
-            cc.beginPath(); cc.arc(x, yy, r * 0.13, 0, TAU); cc.fill();
-            cc.restore();
-          },
-          onTap: function () { G.go('gate'); }
-        });
-      }
-    }
-  });
-
-  /* ------------------------------------------------------- scena: segreto */
-  var sg = { id: null, taps: [], shake: 0, fails: 0 };
-
-  G.scene('segreto', {
-    hud: false, back: false,
-    enter: function (p) {
-      sg.id = p && p.id; sg.taps = []; sg.shake = 0; sg.fails = 0;
-      var a = G.accounts.byId(sg.id);
-      setTimeout(function () {
-        if (G.current !== 'segreto') return;
-        G.say('Ciao ' + (a ? a.name : '') + '! Tocca il tuo segreto.');
-      }, 400);
-    },
-    update: function (dt) { if (sg.shake > 0) sg.shake = Math.max(0, sg.shake - dt * 4); },
-    draw: function (c) {
-      var a = G.accounts.byId(sg.id);
-      if (!a) { G.go('accesso'); return; }
-      backdrop(c, null);
-
-      kartPreview(c, 250, 520, 200, a.color, 0);
-      G.text('Ciao ' + a.name + '!', 250, 178, {
-        ctx: c, size: 48, color: C.sun, stroke: 'rgba(12,20,40,.8)', strokeWidth: 11
-      });
-      G.text('Tocca il tuo segreto', 250, 232, {
-        ctx: c, size: 27, color: C.cream, weight: 700
-      });
-
-      var i;
-      for (i = 0; i < 3; i++) {
-        var sx = 250 + (i - 1) * 74, sy = 290;
-        c.save();
-        c.fillStyle = 'rgba(255,246,224,.24)';
-        c.beginPath(); c.arc(sx, sy, 27, 0, TAU); c.fill();
-        c.restore();
-        if (sg.taps[i] !== undefined) icon(c, sx, sy, 21, sg.taps[i]);
-      }
-
-      var px = 690, py = 132, cell = 148, gap = 14;
-      var jitter = sg.shake > 0 ? Math.sin(G.t * 50) * sg.shake * 10 : 0;
-      for (i = 0; i < 9; i++) {
-        (function (idx) {
-          var bx = px + (idx % 3) * (cell + gap) + jitter;
-          var by = py + Math.floor(idx / 3) * (cell + gap);
-          G.ui.button({
-            id: 'sk' + idx, x: bx, y: by, w: cell, h: cell, r: 24, color: C.cream,
-            icon: function (cc, cx, cy) { icon(cc, cx, cy, cell * 0.29, idx); },
-            onTap: function () {
-              sg.taps.push(idx);
-              G.sfx('pop');
-              if (sg.taps.length < 3) return;
-              var ok = a.secret && a.secret.length === 3 &&
-                a.secret.every(function (v, k) { return v === sg.taps[k]; });
-              if (ok) {
-                G.sfx('good');
-                G.accounts.login(a.id);
-                G.go('menu');
-              } else {
-                sg.fails++; sg.shake = 1; sg.taps = [];
-                G.sfx('bad'); G.shake(6);
-                G.say(G.pick(['Ops! Riprova.', 'Non e questo, riprova!', 'Ancora una volta.']));
-              }
-            }
-          });
-        })(i);
-      }
-
-      G.ui.button({
-        x: 40, y: H - 104, w: 240, h: 82, r: 24, color: C.bark, label: 'Indietro',
-        onTap: function () { G.go('accesso'); }
-      });
-      /* Dopo tre tentativi appare la via d'uscita, dietro al cancello dei
-         grandi: un bambino che ha dimenticato il segreto non deve restare
-         chiuso fuori dal proprio gioco. */
-      if (sg.fails >= 3) {
-        G.ui.button({
-          x: 300, y: H - 104, w: 320, h: 82, r: 24, color: C.tangerine,
-          label: 'Chiedi a un grande', fontSize: 26,
-          onTap: function () { G.go('gate', { then: '@login', arg: a.id, back: 'segreto', backArg: { id: a.id } }); }
-        });
-      }
-    }
-  });
-
-  /* --------------------------------------------------------- scena: nuovo */
-  var nu = { step: 0, name: '', color: COLORS[0], level: 1, secret: [] };
-
-  G.scene('nuovo', {
-    hud: false, back: false,
-    enter: function () {
-      nu = { step: 0, name: '', color: COLORS[0], level: 1, secret: [] };
-      G.prompt('Come ti chiami?', '', function (v) {
-        if (!v) { G.go('accesso'); return; }
-        nu.name = v.slice(0, 14);
-        nu.step = 1;
-        G.say('Ciao ' + nu.name + '! Di che colore e il tuo kart?');
-      });
-    },
-    draw: function (c) {
-      var titles = ['', 'Di che colore e il kart?', 'Quanti anni hai?', 'Scegli il tuo segreto'];
-      backdrop(c, titles[nu.step] || '');
-      var i;
-
-      if (nu.step === 1) {
-        kartPreview(c, W / 2, 470, 250, nu.color, 0);
-        G.text(nu.name, W / 2, 520, { ctx: c, size: 38, color: C.cream });
-        var bw = 128, bg = 18;
-        var x0 = (W - (COLORS.length * bw + (COLORS.length - 1) * bg)) / 2;
-        COLORS.forEach(function (col, k) {
-          G.ui.button({
-            id: 'col' + k, x: x0 + k * (bw + bg), y: 140, w: bw, h: 116, r: 24, color: col,
-            icon: function (cc, cx, cy) {
-              if (nu.color !== col) return;
-              cc.save();
-              cc.strokeStyle = '#fff'; cc.lineWidth = 8; cc.lineCap = 'round'; cc.lineJoin = 'round';
-              cc.beginPath();
-              cc.moveTo(cx - 22, cy); cc.lineTo(cx - 6, cy + 18); cc.lineTo(cx + 24, cy - 18);
-              cc.stroke(); cc.restore();
-            },
-            onTap: function () { nu.color = col; G.sfx('pop'); }
-          });
-        });
-        G.ui.button({
-          x: W / 2 - 180, y: H - 112, w: 360, h: 88, r: 26, color: C.leaf, label: 'Avanti',
-          onTap: function () { nu.step = 2; G.say('Quanti anni hai?'); }
-        });
-      }
-
-      if (nu.step === 2) {
-        /* L'eta non apre giochi diversi: sceglie da quale difficolta si parte.
-           Piu onesto che inventare due modalita che poi non esistono. */
-        [{ lv: 1, t: 'Piccolo', s: '3 - 4 anni', col: C.mint, d: 'Si parte da Facile: 2 giri' },
-         { lv: 2, t: 'Grande', s: '5 - 7 anni', col: C.berry, d: 'Si parte da Gara: 3 giri' }]
-          .forEach(function (o, k) {
-            var x = W / 2 - 340 + k * 360;
-            G.ui.button({
-              id: 'lv' + o.lv, x: x, y: 160, w: 320, h: 280, r: 30,
-              color: nu.level === o.lv ? o.col : G.shade(o.col, -60),
-              label: o.t, sub: o.s, fontSize: 50,
-              onTap: function () { nu.level = o.lv; G.sfx('pop'); }
-            });
-            G.text(o.d, x + 160, 476, { ctx: c, size: 22, color: C.cream, weight: 700 });
-          });
-        G.ui.button({
-          x: W / 2 - 180, y: H - 112, w: 360, h: 88, r: 26, color: C.leaf, label: 'Avanti',
-          onTap: function () { nu.step = 3; G.say('Scegli tre figure: sara il tuo segreto.'); }
-        });
-      }
-
-      if (nu.step === 3) {
-        G.text('Tocca 3 figure e ricordale bene', W / 2, 118, {
-          ctx: c, size: 26, color: C.cream, weight: 700
-        });
-        for (i = 0; i < 3; i++) {
-          var sx = W / 2 + (i - 1) * 88, sy = 176;
-          c.save(); c.fillStyle = 'rgba(255,246,224,.24)';
-          c.beginPath(); c.arc(sx, sy, 31, 0, TAU); c.fill(); c.restore();
-          if (nu.secret[i] !== undefined) icon(c, sx, sy, 24, nu.secret[i]);
-        }
-        var px = W / 2 - 232, py = 228, cell = 138, gap = 16;
-        for (i = 0; i < 9; i++) {
-          (function (idx) {
-            var bx = px + (idx % 3) * (cell + gap), by = py + Math.floor(idx / 3) * (cell + gap);
-            G.ui.button({
-              id: 'nk' + idx, x: bx, y: by, w: cell, h: cell, r: 24, color: C.cream,
-              disabled: nu.secret.length >= 3,
-              icon: function (cc, cx, cy) { icon(cc, cx, cy, cell * 0.28, idx); },
-              onTap: function () { nu.secret.push(idx); G.sfx('pop'); }
-            });
-          })(i);
-        }
-        G.ui.button({
-          x: 34, y: H - 112, w: 240, h: 88, r: 26, color: C.bark, label: 'Rifai', fontSize: 32,
-          onTap: function () { nu.secret = []; }
-        });
-        G.ui.button({
-          x: W - 274, y: H - 112, w: 240, h: 88, r: 26, color: '#5a6472',
-          label: 'Senza segreto', fontSize: 22,
-          onTap: function () { nu.secret = []; finish(); }
-        });
-        if (nu.secret.length === 3) {
-          G.ui.button({
-            x: W / 2 - 160, y: H - 112, w: 320, h: 88, r: 26, color: C.leaf, label: 'Fatto!',
-            onTap: finish
-          });
-        }
-      }
-    }
-  });
-
-  function finish() {
-    var a = G.accounts.create({
-      name: nu.name, color: nu.color, level: nu.level,
-      secret: nu.secret.length === 3 ? nu.secret : null
+  function dino(b, x, y, z, s, col) {
+    var light = shade(col, 1.3), belly = '#f6e7c1';
+    b.ball(x, y + .55 * s, z, .55 * s, .6 * s, .5 * s, col, 4, 8);                // body
+    b.ball(x, y + .5 * s, z + .32 * s, .36 * s, .42 * s, .2 * s, belly, 3, 7);     // belly
+    b.ball(x, y + 1.25 * s, z + .15 * s, .42 * s, .4 * s, .44 * s, col, 4, 8);      // head
+    b.box(x, y + 1.17 * s, z + .55 * s, .5 * s, .3 * s, .45 * s, light);           // snout
+    [-1, 1].forEach(function (k) {
+      b.ball(x + k * .2 * s, y + 1.42 * s, z + .42 * s, .13 * s, .15 * s, .1 * s, '#ffffff', 3, 6);
+      b.ball(x + k * .2 * s, y + 1.43 * s, z + .5 * s, .06 * s, .08 * s, .05 * s, '#2b1d12', 2, 5);
+      b.box(x + k * .55 * s, y + .75 * s, z + .4 * s, .18 * s, .18 * s, .55 * s, col);   // arms to the wheel
     });
-    G.accounts.login(a.id);
-    /* L'eta scelta diventa la difficolta di partenza, una volta sola: da qui in
-       poi comanda il menu, perche un bambino cresce piu in fretta di quanto si
-       rifaccia un profilo. */
-    if (G.kartSave) { G.kartSave().diff = nu.level === 2 ? 1 : 0; G.saveNow(); }
-    G.fx.confetti(); G.sfx('win');
-    G.go('menu');
-    setTimeout(function () { G.say('In pista, ' + a.name + '!'); }, 900);
+    for (var i = 0; i < 4; i++) b.cone(x, y + (1.62 - i * .28) * s, z - (.2 + i * .14) * s, .13 * s, .25 * s, '#ffd75e', 5);
   }
 
-  /* ---------------------------------------------------------- scena: gate */
-  /* Il cancello dei grandi: una moltiplicazione a due cifre. Non e sicurezza,
-     e un attrito che un bambino di sei anni non supera per sbaglio. */
-  var gt = { a: 0, b: 0, typed: '', then: 'gestione', arg: null, back: 'accesso', backArg: null, shake: 0 };
-
-  G.scene('gate', {
-    hud: false, back: false,
-    enter: function (p) {
-      p = p || {};
-      gt.a = G.rndi(6, 9); gt.b = G.rndi(6, 9);
-      gt.typed = ''; gt.shake = 0;
-      gt.then = p.then || 'gestione'; gt.arg = p.arg || null;
-      gt.back = p.back || 'accesso'; gt.backArg = p.backArg || null;
+  /* ---- scenery ---- */
+  var SC = {
+    tree: function (b, x, y, z, k) { b.cyl(x, y, z, .35 * k, 2.2 * k, '#7a4a26', 6); b.cone(x, y + 1.6 * k, z, 2.1 * k, 3.6 * k, '#2f8f4e', 7); b.cone(x, y + 3.2 * k, z, 1.5 * k, 2.4 * k, '#48a863', 7); },
+    round: function (b, x, y, z, k) { b.cyl(x, y, z, .35 * k, 2.4 * k, '#7a4a26', 6); b.ball(x, y + 3.4 * k, z, 2 * k, 1.8 * k, 2 * k, '#3f9a5c', 3, 7); },
+    pine: function (b, x, y, z, k, snow) { b.cyl(x, y, z, .3 * k, 1.4 * k, '#6a4222', 6); for (var i = 0; i < 3; i++) b.cone(x, y + (1 + i * 1.5) * k, z, (2 - i * .5) * k, 2.4 * k, snow && i === 2 ? '#f4f8fb' : '#1f6b45', 7); },
+    palm: function (b, x, y, z, k) {
+      for (var i = 0; i < 6; i++) b.cyl(x + i * .18 * k, y + i * .9 * k, z, (.38 - i * .03) * k, .95 * k, i % 2 ? '#a0703c' : '#8a5a32', 6);
+      for (var j = 0; j < 6; j++) { var a = j / 6 * Math.PI * 2, tx = x + 1.1 * k, ty = y + 5.5 * k; b.push(M4.mul(M4.trans(tx, ty, z), M4.rotY(a))); b.quad([0, 0, -.5 * k], [3 * k, -1 * k, -.2 * k], [3 * k, -1 * k, .2 * k], [0, 0, .5 * k], '#2f9e57'); b.quad([0, 0, .5 * k], [3 * k, -1 * k, .2 * k], [3 * k, -1 * k, -.2 * k], [0, 0, -.5 * k], '#2a8a4c'); b.pop(); }
     },
-    update: function (dt) { if (gt.shake > 0) gt.shake = Math.max(0, gt.shake - dt * 4); },
-    draw: function (c) {
-      backdrop(c, null);
-      G.text('Solo per i grandi', W / 2, 74, {
-        ctx: c, size: 46, color: C.cream, stroke: 'rgba(12,20,40,.8)', strokeWidth: 10
-      });
+    rock: function (b, x, y, z, k, col) { b.ball(x, y + .4 * k, z, 1.6 * k, 1.1 * k, 1.3 * k, col || '#8e9a8e', 2, 5); },
+    bush: function (b, x, y, z, k) { b.ball(x, y + .7 * k, z, 1.4 * k, 1 * k, 1.4 * k, '#3b8f4f', 3, 6); b.ball(x + .6 * k, y + 1.4 * k, z, .25 * k, .25 * k, .25 * k, '#ff6fae', 2, 5); },
+    flower: function (b, x, y, z, k) { b.cyl(x, y, z, .08 * k, 1 * k, '#2f8f4e', 4); b.ball(x, y + 1.1 * k, z, .45 * k, .2 * k, .45 * k, ['#ff6fae', '#ffd75e', '#8f5bd6'][Math.floor(Math.abs(x * 7 + z)) % 3], 2, 6); },
+    mushroom: function (b, x, y, z, k) { b.cyl(x, y, z, .5 * k, 1.6 * k, '#f6e7c1', 7); b.ball(x, y + 1.8 * k, z, 1.6 * k, .9 * k, 1.6 * k, '#e8536b', 3, 8); b.ball(x + .6 * k, y + 2.4 * k, z + .4 * k, .3 * k, .15 * k, .3 * k, '#ffffff', 2, 5); },
+    tower: function (b, x, y, z, k) { b.cyl(x, y, z, 2.2 * k, 9 * k, '#9aa0a6', 8); b.cone(x, y + 9 * k, z, 2.8 * k, 4 * k, '#c0392b', 8); b.box(x, y + 6 * k, z + 2.1 * k, .8 * k, 1.4 * k, .3 * k, '#2b2b33'); },
+    lollipop: function (b, x, y, z, k) { b.cyl(x, y, z, .15 * k, 4 * k, '#fff6e0', 5); b.push(M4.mul(M4.trans(x, y + 5 * k, z), M4.rotX(Math.PI / 2))); b.cyl(0, -.3 * k, 0, 1.6 * k, .6 * k, ['#ff6fae', '#38d9a9', '#ffd75e', '#8f5bd6'][Math.floor(Math.abs(x + z)) % 4], 10); b.pop(); },
+    candy: function (b, x, y, z, k) { b.box(x, y + 1 * k, z, 2.4 * k, 2 * k, 2.4 * k, ['#ff9fc8', '#9fe3ff', '#fff19a'][Math.floor(Math.abs(x * 3 + z)) % 3], '#ffffff'); },
+    lavarock: function (b, x, y, z, k) { b.ball(x, y + .6 * k, z, 1.8 * k, 1.4 * k, 1.6 * k, '#3a2430', 2, 5); b.cone(x, y + 1.4 * k, z, .6 * k, 1 * k, '#ff7a1a', 5); },
+    volcano: function (b, x, y, z, k) { b.cyl(x, y, z, 30 * k, 26 * k, '#4a2330', 9, 7 * k, '#ff7a1a'); },
+    iceberg: function (b, x, y, z, k) { b.cone(x, y, z, 2.2 * k, 4 * k, '#dff4fb', 5); },
+    snowman: function (b, x, y, z, k) { b.ball(x, y + 1 * k, z, 1.1 * k, 1 * k, 1.1 * k, '#ffffff', 3, 7); b.ball(x, y + 2.4 * k, z, .75 * k, .7 * k, .75 * k, '#ffffff', 3, 7); b.cone(x, y + 2.5 * k, z + .7 * k, .12 * k, .6 * k, '#ff9f43', 5); },
+    star: function (b, x, y, z, k) {
+      var col = ['#ffd75e', '#ff6fae', '#38d9a9', '#4d80e4'][Math.floor(Math.abs(x * 3 + z)) % 4];
+      for (var i = 0; i < 5; i++) { var a = i / 5 * Math.PI * 2, a2 = a + Math.PI / 5; b.tri([x, y, z], [x + Math.cos(a) * 2 * k, y + Math.sin(a) * 2 * k, z], [x + Math.cos(a2) * .8 * k, y + Math.sin(a2) * .8 * k, z], col); b.tri([x, y, z], [x + Math.cos(a2) * .8 * k, y + Math.sin(a2) * .8 * k, z], [x + Math.cos(a) * 2 * k, y + Math.sin(a) * 2 * k, z], col); }
+    },
+    planet: function (b, x, y, z, k) { b.ball(x, y, z, 8 * k, 8 * k, 8 * k, ['#8f5bd6', '#4d80e4', '#ff9f43'][Math.floor(Math.abs(x + z)) % 3], 5, 10); },
+    fence: function () {}
+  };
 
-      var j = gt.shake > 0 ? Math.sin(G.t * 48) * gt.shake * 12 : 0;
-      c.save();
-      c.fillStyle = 'rgba(14,20,34,.6)';
-      G.roundRect(c, 150 + j, 160, 440, 290, 26); c.fill();
-      c.restore();
-      G.text(gt.a + ' x ' + gt.b + ' = ?', 370 + j, 246, { ctx: c, size: 66, color: C.sun });
-      c.save();
-      c.fillStyle = 'rgba(255,246,224,.9)';
-      G.roundRect(c, 210 + j, 312, 320, 92, 20); c.fill(); c.restore();
-      G.text(gt.typed || '-', 370 + j, 358, { ctx: c, size: 54, color: C.ink });
+  /* ---- race objects ---- */
+  function itemBox(b) {
+    var cols = ['#ff6fae', '#ffd75e', '#38d9a9', '#4d80e4', '#ff9f43', '#8f5bd6'], s = .8;
+    var p = function (i, j, k) { return [i * s, j * s, k * s]; };
+    b.quad(p(-1, 1, -1), p(-1, 1, 1), p(1, 1, 1), p(1, 1, -1), cols[0]); b.quad(p(-1, -1, 1), p(-1, -1, -1), p(1, -1, -1), p(1, -1, 1), cols[1]);
+    b.quad(p(-1, -1, 1), p(1, -1, 1), p(1, 1, 1), p(-1, 1, 1), cols[2]); b.quad(p(1, -1, -1), p(-1, -1, -1), p(-1, 1, -1), p(1, 1, -1), cols[3]);
+    b.quad(p(1, -1, 1), p(1, -1, -1), p(1, 1, -1), p(1, 1, 1), cols[4]); b.quad(p(-1, -1, -1), p(-1, -1, 1), p(-1, 1, 1), p(-1, 1, -1), cols[5]);
+    b.box(0, 0, 0, .5, .5, .5, '#ffffff');
+  }
+  function banana(b) { for (var i = 0; i < 5; i++) { var a = (i - 2) * .32; b.box(Math.sin(a) * 1.0, .35 + Math.cos(a) * .5 - .5 + .4, 0, .34, .34, .34, i === 0 || i === 4 ? '#7a5a26' : '#ffd75e'); } }
+  function shell(b, col) { b.ball(0, .35, 0, .75, .6, .75, col, 3, 8); b.cyl(0, .1, 0, .8, .25, '#fff6e0', 8); }
+  function fruit(b) { b.cone(0, -.5, 0, .55, 1.0, '#e8536b', 6); b.push(M4.rotX(Math.PI)); b.cone(0, -.55, 0, .55, .45, '#e8536b', 6); b.pop(); b.cone(0, .5, 0, .35, .3, '#2f8f4e', 5); }
+  function starItem(b) { SC.star(b, 0, 0, 0, .55); b.push(M4.rotY(Math.PI)); SC.star(b, 0, 0, 0, .55); b.pop(); }
+  function boostPad(b) { for (var i = 0; i < 3; i++) { var z = i * 1.6 - 1.6; b.quad([-1.8, .05, z - .3], [0, .05, z + .9], [0, .05, z + .3], [-1.8, .05, z - .9], '#ffd75e'); b.quad([0, .05, z + .9], [1.8, .05, z - .3], [1.8, .05, z - .9], [0, .05, z + .3], '#ffd75e'); } b.box(0, .02, 0, 4.4, .04, 5.6, '#ff9f43'); }
+  function trophy(b, col) {
+    b.box(0, .4, 0, 1.6, .8, 1.6, '#5a3a1c', '#7a4a26');
+    b.cyl(0, .8, 0, .3, 1.0, col, 8); b.cyl(0, 1.8, 0, .4, 1.4, col, 10, 1.1);
+    b.push(M4.mul(M4.trans(-1.1, 2.6, 0), M4.rotZ(Math.PI / 2))); b.cyl(0, -.1, 0, .35, .2, col, 8); b.pop();
+    b.push(M4.mul(M4.trans(1.3, 2.6, 0), M4.rotZ(Math.PI / 2))); b.cyl(0, -.1, 0, .35, .2, col, 8); b.pop();
+  }
+  function podium(b) {
+    b.box(0, 1.5, 0, 4, 3, 4, '#ffd75e', '#fff19a'); b.box(-4, 1, 0, 4, 2, 4, '#c9ced4', '#e9edf0'); b.box(4, .6, 0, 4, 1.2, 4, '#d58a4a', '#eab07a');
+  }
 
-      var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'];
-      var kx = 690, ky = 150, kw = 148, kh = 112, kg = 14;
-      keys.forEach(function (k, i) {
-        G.ui.button({
-          id: 'g' + k, x: kx + (i % 3) * (kw + kg), y: ky + Math.floor(i / 3) * (kh + kg),
-          w: kw, h: kh, r: 22,
-          color: k === 'OK' ? C.leaf : k === 'C' ? C.berry : C.cream,
-          textColor: (k === 'OK' || k === 'C') ? '#fff' : C.ink,
-          label: k, fontSize: 42,
-          onTap: function () {
-            if (k === 'C') { gt.typed = ''; return; }
-            if (k === 'OK') {
-              if (parseInt(gt.typed, 10) === gt.a * gt.b) {
-                G.sfx('good');
-                if (gt.then === '@login') { G.accounts.login(gt.arg); G.go('menu'); }
-                else G.go(gt.then, gt.arg);
-              } else { gt.shake = 1; gt.typed = ''; G.sfx('bad'); }
-              return;
-            }
-            if (gt.typed.length < 3) gt.typed += k;
-          }
-        });
-      });
-
-      G.ui.button({
-        x: 150, y: H - 100, w: 280, h: 80, r: 24, color: C.bark, label: 'Annulla',
-        onTap: function () { G.go(gt.back, gt.backArg); }
-      });
-    }
-  });
-
-  /* ------------------------------------------------------ scena: gestione */
-  var gs = { sel: 0, confirm: 0 };
-
-  G.scene('gestione', {
-    hud: false, back: false,
-    enter: function () { gs.sel = 0; gs.confirm = 0; },
-    update: function (dt) { if (gs.confirm > 0) gs.confirm = Math.max(0, gs.confirm - dt); },
-    draw: function (c) {
-      backdrop(c, 'Piloti');
-      var list = G.accounts.list();
-      if (!list.length) { G.go('accesso'); return; }
-      if (gs.sel >= list.length) gs.sel = 0;
-      var a = list[gs.sel];
-
-      // la fila dei piloti, per scegliere su chi si sta lavorando
-      var cw = 128, gap = 14;
-      var x0 = (W - (list.length * cw + (list.length - 1) * gap)) / 2;
-      list.forEach(function (p, i) {
-        G.ui.button({
-          id: 'sel' + p.id, x: x0 + i * (cw + gap), y: 116, w: cw, h: 116, r: 22,
-          color: i === gs.sel ? p.color : G.shade(p.color, -70),
-          label: p.name, fontSize: 22,
-          onTap: function () { gs.sel = i; gs.confirm = 0; G.sfx('pop'); }
-        });
-      });
-
-      kartPreview(c, 300, 470, 200, a.color, 0);
-      G.text(a.name, 300, 520, { ctx: c, size: 36, color: C.cream });
-
-      var bx = 620, bw = 420, bh = 76, bg = 14, y = 262;
-      function row(label, color, onTap, sub) {
-        G.ui.button({ x: bx, y: y, w: bw, h: bh, r: 22, color: color, label: label, sub: sub, fontSize: 28, onTap: onTap });
-        y += bh + bg;
-      }
-      row('Cambia nome', C.bark, function () {
-        G.prompt('Nome del pilota', a.name, function (v) {
-          if (v) G.accounts.update(a.id, { name: v.slice(0, 14) });
-        });
-      });
-      row('Cambia colore', C.plum, function () {
-        var i = COLORS.indexOf(a.color);
-        G.accounts.update(a.id, { color: COLORS[(i + 1) % COLORS.length] });
-        G.sfx('pop');
-      });
-      row(gs.confirm > 0 ? 'Sicuro? Tocca ancora' : 'Elimina pilota',
-        gs.confirm > 0 ? C.berry : '#5a6472',
-        function () {
-          if (gs.confirm > 0) {
-            if (G.account && G.account.id === a.id) G.accounts.logout();
-            G.accounts.remove(a.id);
-            gs.confirm = 0; gs.sel = 0;
-            G.sfx('bad');
-            if (!G.accounts.list().length) G.go('accesso');
-          } else { gs.confirm = 4; }
-        },
-        gs.confirm > 0 ? 'annulla fra ' + Math.ceil(gs.confirm) + 's' : null);
-
-      G.ui.button({
-        x: W / 2 - 170, y: H - 100, w: 340, h: 80, r: 24, color: C.leaf, label: 'Fatto',
-        onTap: function () { G.go('accesso'); }
-      });
-    }
-  });
+  /* build and upload once, lazily */
+  var cache = {};
+  function get(key, fn) { if (!cache[key]) { var b = new GL.Builder(); fn(b); cache[key] = GL.upload(b); } return cache[key]; }
+  G.models = {
+    kart: function (col) { return get('kart' + col, function (b) { kart(b, col); }); },
+    itemBox: function () { return get('box', itemBox); },
+    banana: function () { return get('banana', banana); },
+    shell: function (red) { return get('shell' + (red ? 'r' : 'g'), function (b) { shell(b, red ? '#e8362b' : '#2f9e57'); }); },
+    fruit: function () { return get('fruit', fruit); },
+    star: function () { return get('star', starItem); },
+    pad: function () { return get('pad', boostPad); },
+    trophy: function (col) { return get('trophy' + col, function (b) { trophy(b, col); }); },
+    podium: function () { return get('podium', podium); },
+    blob: function () { return get('blob', function (b) { for (var i = 0; i < 10; i++) { var a = i / 10 * Math.PI * 2, a2 = (i + 1) / 10 * Math.PI * 2; b.tri([0, .03, 0], [Math.cos(a2) * 1.4, .03, Math.sin(a2) * 1.8], [Math.cos(a) * 1.4, .03, Math.sin(a) * 1.8], '#000000'); } }); },
+    SC: SC, dino: dino, kartBuild: kart, shade: shade
+  };
 })();
 
 
-/* ==================== 05-menu.js ==================== */
-/* Dino Kart — the front of the game (scene: menu).
-
-   This exists because without it there is no game, only a driving demo: you
-   opened the thing and were already mid-race, with no start, no laps and no way
-   to finish. A race needs a before and an after, and this is the before.
-
-   Owns G.save.kart = { best: {trackId: seconds}, wins, races }. */
+/* ==================== 20-tracks.js ==================== */
+/* Dino Kart — the eight tracks.
+   A track is a closed loop of control points [x, z, y] (metres, y = height).
+   It becomes a Catmull-Rom curve sampled every STEP metres; everything — the
+   physics, the AI's racing line, the road mesh, where trees grow — is built
+   from those samples. Directions: heading `a` points along (cos a, sin a) in
+   the x-z plane, and the right-hand side of the road is (-sin a, cos a). */
 (function () {
   'use strict';
+  var STEP = 2;
 
-  var C = G.C, W = G.W, H = G.H;
+  var THEMES = {
+    prato: { sky: ['#6fc0e8', '#d6f0fb'], fog: '#cfe9f5', ground: ['#6db35a', '#64aa52'], road: ['#7b8088', '#737880'], line: '#fff6e0', curb: ['#e8536b', '#fff6e0'], wall: ['#e8536b', '#fff6e0'], far: '#79bb64', hills: '#9cc7b5', sc: { tree: 3, round: 2, flower: 3, bush: 2, mushroom: 1 } },
+    spiaggia: { sky: ['#4fc4ef', '#e6f8f4'], fog: '#d9f2f6', ground: ['#f2d9a8', '#ead09a'], road: ['#8a8f96', '#828790'], line: '#fff6e0', curb: ['#4d80e4', '#fff6e0'], wall: ['#4d80e4', '#fff6e0'], far: '#3fb6c9', water: '#3fb6c9', hills: '#8fd3e0', sc: { palm: 5, rock: 1, bush: 1 } },
+    giungla: { sky: ['#8fd3b6', '#e3f6ec'], fog: '#cfe9dc', ground: ['#3f8f4a', '#388445'], road: ['#8a6a4a', '#82634a'], line: '#f6e7c1', curb: ['#ffd75e', '#2b1d12'], wall: ['#7a4a26', '#a0703c'], far: '#2f7a40', hills: '#5c9a74', sc: { round: 3, tree: 2, palm: 1, bush: 3, flower: 2, mushroom: 1 } },
+    castello: { sky: ['#3d3a66', '#a596cf'], fog: '#8f86b8', ground: ['#5c7a4a', '#557245'], road: ['#8e8a86', '#86827e'], line: '#e9e2d0', curb: ['#c0392b', '#e9e2d0'], wall: ['#9aa0a6', '#7b8188'], far: '#4a6a3e', hills: '#5a5488', sc: { tower: 2, pine: 2, rock: 2 } },
+    neve: { sky: ['#9fd0f2', '#f2f8fd'], fog: '#e6f0f7', ground: ['#f4f8fb', '#e8f0f5'], road: ['#7f8b96', '#77838e'], line: '#ffffff', curb: ['#4d80e4', '#ffffff'], wall: ['#4d80e4', '#ffffff'], far: '#eef4f8', hills: '#c7dceb', sc: { snowpine: 4, snowman: 1, iceberg: 1, rock: 1 } },
+    vulcano: { sky: ['#2a1018', '#8a3a2a'], fog: '#5c2626', ground: ['#4a3a3f', '#403238'], road: ['#5a5357', '#524b4f'], line: '#ffb04a', curb: ['#ff7a1a', '#2b1d12'], wall: ['#3a2430', '#ff7a1a'], far: '#ff7a1a', water: '#ff7a1a', hills: '#3a1622', sc: { lavarock: 3, rock: 2 } },
+    dolci: { sky: ['#ffbfe3', '#fff1f8'], fog: '#ffe6f3', ground: ['#ffe0ef', '#ffd3e8'], road: ['#8a5a3c', '#7e5136'], line: '#fff6e0', curb: ['#ff6fae', '#ffffff'], wall: ['#38d9a9', '#ffffff'], far: '#ffd3e8', hills: '#ffb3d6', sc: { lollipop: 3, candy: 3, mushroom: 1 } },
+    arcobaleno: { sky: ['#07071f', '#24184f'], fog: '#1a1440', ground: null, road: null, line: '#ffffff', curb: ['#ffffff', '#ffd75e'], wall: null, far: null, hills: null, space: true, sc: { star: 5, planet: 1 } }
+  };
+  var RAINBOW = ['#ff5c6c', '#ff9f43', '#ffd75e', '#38d9a9', '#4d80e4', '#8f5bd6'];
 
-  function br() {
-    var g = G.save.kart;
-    if (!g || typeof g !== 'object' || Array.isArray(g)) g = G.save.kart = {};
-    if (!g.best || typeof g.best !== 'object') g.best = {};
-    if (typeof g.wins !== 'number' || !isFinite(g.wins) || g.wins < 0) g.wins = 0;
-    if (typeof g.races !== 'number' || !isFinite(g.races) || g.races < 0) g.races = 0;
-    if (g.diff !== 0 && g.diff !== 1 && g.diff !== 2) g.diff = G.level === 2 ? 1 : 0;
-    if (typeof g.track !== 'number' || !isFinite(g.track) || g.track < 0) g.track = 0;
-    return g;
-  }
-  G.kartSave = br;
-
-  /* FACILE NON VUOL DIRE "AVVERSARI ASSENTI". Il gruppo deve restare vicino
-     anche al primo giro: cambiano la pressione e la lunghezza della gara, non
-     il fatto di avere qualcuno da rincorrere e da colpire. */
-  var DIFF = [
-    { id: 0, name: 'Facile', sub: '2 giri · per iniziare', laps: 2, rivalScale: 0.97, color: '#38d9a9' },
-    { id: 1, name: 'Gara', sub: '3 giri · sfida giusta', laps: 3, rivalScale: 1.00, color: '#4d80e4' },
-    { id: 2, name: 'Campioni', sub: '3 giri · super sfida', laps: 3, rivalScale: 1.04, color: '#e8536b' }
-  ];
-  G.kartDiff = function () { return DIFF[br().diff] || DIFF[0]; };
-
-  function fmt(t) {
-    if (!t || !isFinite(t)) return '--';
-    var m = Math.floor(t / 60), s = t - m * 60;
-    return (m > 0 ? m + "'" : '') + (s < 10 && m > 0 ? '0' : '') + s.toFixed(2) + '"';
-  }
-
-  G.scene('menu', {
-    hud: false, back: false,
-
-    enter: function () {
-      br();
-      setTimeout(function () {
-        if (G.current !== 'menu') return;
-        G.say(G.pick(['Pronti a correre?', 'Si va in pista!', 'Che gara facciamo?']));
-      }, 400);
-    },
-
-    draw: function (c) {
-      var g = br(), i;
-
-      var sky = c.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, '#1b2740');
-      sky.addColorStop(0.55, '#3d5b86');
-      sky.addColorStop(1, '#7a9ec4');
-      c.fillStyle = sky; c.fillRect(0, 0, W, H);
-
-      // a strip of tarmac across the bottom, so the title sits on a track
-      c.fillStyle = '#5d6169'; c.fillRect(0, H - 168, W, 168);
-      c.fillStyle = '#494d55'; c.fillRect(0, H - 168, W, 10);
-      c.fillStyle = 'rgba(255,246,224,.75)';
-      for (i = 0; i < 9; i++) c.fillRect(40 + i * 150, H - 74, 84, 12);
-
-      G.text('DINO KART', W / 2, 132, {
-        ctx: c, size: 96, color: C.sun, stroke: 'rgba(12,20,40,.85)', strokeWidth: 16
-      });
-
-      if (A.kartBack) {
-        A.kartBack(c, W / 2, H - 96, 260, {
-          color: (G.account && G.account.color) || C.dino,
-          lean: Math.sin(G.t * 1.4) * 0.35,
-          bob: Math.sin(G.t * 3) * 0.6,
-          hat: typeof G.save.hat === 'string' ? G.save.hat : null
-        });
-      }
-
-      /* Track picker. One track today, and the row is built from the list so the
-         second one needs no new layout. */
-      var tracks = G.kartTracks ? G.kartTracks() : [{ name: 'La Collina' }];
-      if (g.track >= tracks.length) g.track = 0;
-      var tw = 300, tg = 26;
-      var tx0 = (W - (tracks.length * tw + (tracks.length - 1) * tg)) / 2;
-      for (i = 0; i < tracks.length; i++) {
-        (function (idx) {
-          var t = tracks[idx];
-          var bx = tx0 + idx * (tw + tg), on = g.track === idx;
-          G.ui.button({
-            id: 'trk' + idx, x: bx, y: 226, w: tw, h: 118, r: 26,
-            color: on ? C.leaf : 'rgba(255,246,224,.22)',
-            label: t.name, fontSize: 34,
-            /* The best lap once you have one, the track's character until then:
-               a row of "--" tells a child nothing about which one to pick. */
-            sub: g.best[t.id] ? fmt(g.best[t.id]) + ' il giro' : (t.sub || ''),
-            onTap: function () { g.track = idx; G.saveNow(); G.sfx('pop'); }
-          });
-        })(i);
-      }
-
-      // difficulty
-      for (i = 0; i < DIFF.length; i++) {
-        (function (idx) {
-          var d = DIFF[idx], dw = 292, gap = 18, bx = (W - (DIFF.length * dw + (DIFF.length - 1) * gap)) / 2 + idx * (dw + gap), on = g.diff === idx;
-          G.ui.button({
-            id: 'dif' + idx, x: bx, y: 368, w: dw, h: 112, r: 26,
-            color: on ? d.color : 'rgba(255,246,224,.22)',
-            label: d.name, sub: d.sub, fontSize: 36,
-            onTap: function () { g.diff = idx; G.saveNow(); G.sfx('pop'); }
-          });
-        })(i);
-      }
-
-      G.ui.button({
-        id: 'via', x: W / 2 - 190, y: 500, w: 380, h: 118, r: 30,
-        color: C.sun, textColor: C.ink, label: 'VIA!', fontSize: 54,
-        onTap: function () { G.go('pista'); }
-      });
-
-      /* Chi sta guidando, in alto a sinistra, e si tocca per cambiarlo. Senza
-         questo la scelta del pilota sarebbe una porta a senso unico: entri una
-         volta e il fratello non entra mai piu'. */
-      var me = G.account;
-      if (me) {
-        c.save();
-        c.fillStyle = 'rgba(14,20,34,.55)';
-        G.roundRect(c, 24, 24, 250, 74, 22); c.fill();
-        c.strokeStyle = 'rgba(255,246,224,.22)'; c.lineWidth = 2;
-        G.roundRect(c, 24, 24, 250, 74, 22); c.stroke();
-        c.fillStyle = me.color;
-        c.beginPath(); c.arc(66, 61, 22, 0, 6.2832); c.fill();
-        c.strokeStyle = 'rgba(12,20,34,.7)'; c.lineWidth = 3; c.stroke();
-        c.restore();
-        G.text(me.name, 178, 50, { ctx: c, size: 26, color: C.cream, maxWidth: 176 });
-        G.text('cambia pilota', 178, 78, { ctx: c, size: 17, color: 'rgba(255,246,224,.65)', weight: 700 });
-        G.ui.button({
-          id: 'chiguida', x: 24, y: 24, w: 250, h: 74, r: 22, ghost: true,
-          onTap: function () { G.accounts.logout(); G.go('accesso'); }
-        });
-      }
-
-      if(!matchMedia('(pointer: coarse)').matches)G.text('? ? sterza     SPAZIO lancia',640,655,{size:24,color:C.cream});
-      if (g.races > 0) {
-        G.text(g.wins + ' vittorie su ' + g.races + ' gare', W / 2, H - 26, {
-          ctx: c, size: 24, color: 'rgba(255,246,224,.8)', weight: 800
-        });
-      }
-    }
-  });
-})();
-
-
-/* ==================== 10-pista.js ==================== */
-/* Dino Kart — "La Pista" (scene: pista). The road, seen from behind the kart.
-
-   PSEUDO-3D BY SEGMENTS, the Out Run / Super Mario Kart technique, and the whole
-   reason this project is a separate game: it gives the view from behind the
-   wheel, which is what makes a kart game a kart game.
-
-   How it works, because it is worth writing down once:
-     - The track is a list of SEGMENTS, each SEG_LEN long, each with a curve
-       amount and a hill amount. There is no 3D geometry anywhere.
-     - Each segment has a world point (x, y, z). Projecting it is one divide:
-       scale = CAM_D / (z - cameraZ), and screen x/y/width fall out of that.
-     - Drawing is back-to-front, one trapezium per segment between the current
-       projected point and the previous one. Far segments are a few pixels tall,
-       near ones fill the bottom of the screen.
-     - Curves are FAKE, and that is the trick: the road never actually bends in
-       world space. Each segment carries a horizontal offset that accumulates
-       towards the horizon, so the ribbon leans across the screen. The kart's own
-       x drifts by the same accumulated curve, which is what makes a bend feel
-       like it pushes you outwards.
-
-   The camera sits a fixed distance behind the kart and looks down the z axis, so
-   there is no camera maths beyond one subtraction.
-
-   Coordinates: the engine gives us a logical 1280x720. Road half-width is in the
-   same arbitrary world units as z; only their RATIO matters, because everything
-   goes through the same projection. */
-(function () {
-  'use strict';
-
-  var C = G.C, W = G.W, H = G.H;
-
-  var SEG_LEN = 200;             // world length of one segment
-  /* HALF-WIDTH OF THE ROAD, and it is the number that made this unplayable.
-     At 2000 the road came out 2688px wide where the kart sits — more than twice
-     the screen — so in the bottom half of the picture you could see NEITHER
-     edge. Nothing told you where on the road you were until you were already
-     off it. Crash Team Racing is the opposite: a road you can see the width of,
-     with both sides in frame. At 1150 the road is about 1.2 screens wide at the
-     kart, so the two edges are always there to steer between. */
-  var ROAD_W = 1150;
-  /* Plan curve values were written when ROAD_W was 2000 and the accumulated
-     bend was in raw world units, which quietly tied "how bent the road looks"
-     to "how wide the road is". Dividing by that old width makes the bend a
-     fraction of the ROAD instead, so ROAD_W is now a purely visual knob and
-     changing it cannot silently restyle every corner on both tracks. */
-  var CURVE_SCALE = 1 / 2000;
-  var DRAW_N = 300;              // how many segments ahead we draw
-  var CAM_H = 1000;              // camera height above the road
-  var CAM_D = 0.84;              // depth-of-field: bigger = narrower lens
-  var HORIZON = 300;             // screen y of the vanishing point at rest
-  var CAM_BACK = 800;            // how far behind the kart the camera sits
-  var KART_W = 420;              // a kart, in world units — see drawRivals
-  /* HOW FAR OFF THE ROAD YOU CAN GET. CTR has walls; you can put a wheel on the
-     dirt, you cannot emigrate. At 2.4 road-widths the tarmac left the screen
-     entirely and you were alone in a field with a tree, with no way to tell
-     which way the track had gone — the single worst thing in the game. */
-  var OFF_MAX = 1.30;
-  var FIRE_Y = 618;              // sotto questa riga, ad arma carica, si spara
-
-  /* Palette of whatever track is loaded. Swapped wholesale in buildTrack, so
-     nothing downstream has to know which track it is drawing. */
-  var COL = {};
-
-  /* --------------------------------------------------------------- track */
-  /* A track is built from a handful of instructions; the segment list is
-     expanded once at entry. `curve` is how hard it bends, `hill` how steep. */
   var TRACKS = [
-    {
-      id: 'collina',
-      name: 'La Collina',
-      sub: 'prati e saliscendi',
-      sky: ['#7fc6e8', '#cfeafc'],
-      prop: 'albero',
-      col: {
-        grassLight: '#78af59', grassDark: '#6ba451',
-        roadLight: '#787d86', roadDark: '#5a5e66',
-        rumbleLight: '#e8536b', rumbleDark: '#fff6e0',
-        laneMark: '#fff6e0'
-      },
-      /* A LAP IS TWENTY SECONDS. The first version of this plan came to 580
-         segments, which at full speed is a lap every ten — so an easy race was
-         over in nineteen seconds, before a child had finished working out which
-         side of the screen turns which way. Length is the cheapest thing in a
-         segment renderer: the ribbon costs the same to draw whether the loop is
-         short or long, only the list is bigger.
-
-         LONG CORNERS, NOT SHARP ONES, and this is the difference between a
-         track and a corridor. Simulating a driver who never touches the screen
-         showed the second version of this plan was a corridor: he finished
-         first, on the tarmac the whole way, having done nothing — the exact
-         complaint that got Il Girotondo demoted to a roundabout. Short bends
-         that alternate cancel each other out before they can push you anywhere.
-         What pushes you into the grass is a bend that goes ON: a moderate curve
-         held for two and a half seconds drifts you a whole road-width, while
-         full lock still out-pulls it instantly, so it is demanding without ever
-         being unholdable. Nothing here exceeds a curve of 3.0 for that reason.
-
-         E UN ANELLO DEVE GIRARE. Disegnare la mappa ha scoperto una cosa che
-         in prima persona non si vedeva affatto: queste non erano piste, erano
-         strade. Curve destre e sinistre si bilanciavano quasi esattamente, giro
-         netto quasi zero, quindi il percorso se ne andava in diagonale e non
-         tornava mai a casa - e nessuna scala di disegno poteva farne un anello,
-         perche un anello non c'era. Ora La Collina gira in senso orario (una
-         sola sinistra, di respiro) e La Spiaggia in senso antiorario, ognuna
-         con un giro netto di circa 360 gradi. La mappa esce da se. */
-      plan: [
-        ['rettilineo di partenza', 90, 0, 0],
-        ['curvone dx', 160, 2.6, 0],
-        ['respiro', 45, 0, 0],
-        ['salita', 40, 0, 20],
-        ['tornante dx', 120, 2.9, 0],
-        ['discesa', 40, 0, -20],
-        ['esse sx', 55, -2.2, 0],
-        ['esse dx', 55, 2.2, 0],
-        ['dritto', 50, 0, 0],
-        ['curvone dx in salita', 150, 2.4, 12],
-        ['dosso', 30, 0, 24],
-        ['contro-dosso', 30, 0, -24],
-        ['la sola sinistra', 70, -2.0, -12],
-        ['dritto', 45, 0, 0],
-        ['curvone dx lungo', 160, 2.5, 0],
-        ['respiro', 40, 0, 0],
-        ['ultima dx', 120, 2.6, 0],
-        ['rettilineo finale', 100, 0, 0]
-      ]
-    },
-
-    /* THE SECOND TRACK, and its job is to be a different drive, not the same
-       drive repainted. La Collina is long open bends you lean on; La Spiaggia is
-       shorter, tighter and busier — more corners per minute, less road between
-       them, and a sting in the tail. It went through the same simulation as the
-       first: a driver who never touches the screen has to finish last here too,
-       and the sharpest bend has to stay inside full lock. Different feel, same
-       two rules. */
-    {
-      id: 'spiaggia',
-      name: 'La Spiaggia',
-      sub: 'stretta e nervosa',
-      sky: ['#ffb066', '#ffe6b8'],
-      prop: 'palma',
-      col: {
-        grassLight: '#f0d79b', grassDark: '#cfae72',
-        roadLight: '#868b95', roadDark: '#666b74',
-        rumbleLight: '#3aa7d6', rumbleDark: '#fff6e0',
-        laneMark: '#fff6e0'
-      },
-      plan: [
-        ['rettilineo di partenza', 70, 0, 0],
-        ['curva sx sul mare', 120, -2.8, 0],
-        ['respiro', 35, 0, 0],
-        ['salitella', 30, 0, 18],
-        ['curvone sx sulle dune', 140, -2.5, 0],
-        ['discesa', 30, 0, -18],
-        ['esse dx', 50, 2.4, 0],
-        ['esse sx', 50, -2.4, 0],
-        ['dritto', 40, 0, 0],
-        ['tornante sx del molo', 130, -3.0, 0],
-        ['dossetto', 26, 0, 20],
-        ['contro-dossetto', 26, 0, -20],
-        ['la sola destra', 60, 2.2, 0],
-        ['dritto', 40, 0, 0],
-        ['curvone sx', 150, -2.6, 0],
-        ['respiro', 35, 0, 0],
-        ['ultima sx', 95, -2.9, 0],
-        ['rettilineo del traguardo', 80, 0, 0]
-      ]
-    }
+    { id: 'prato', name: 'Prato Fiorito', theme: 'prato', cup: 0, width: 17,
+      pts: [[0, 0, 0], [150, 0, 0], [240, 40, 3], [270, 130, 8], [220, 210, 10], [120, 230, 6], [30, 200, 2], [-20, 130, 0], [-60, 60, 2], [-50, 10, 0]],
+      feats: [['fruits', .06, 0], ['boxes', .2], ['pad', .36, 0], ['fruits', .45, -4], ['boxes', .58], ['fruits', .75, 4], ['boxes', .86]] },
+    { id: 'spiaggia', name: 'Spiaggia Cocco', theme: 'spiaggia', cup: 0, width: 17,
+      pts: [[0, 0, 0], [200, 0, 0], [300, 60, 0], [320, 160, 2], [250, 230, 4], [150, 200, 2], [80, 250, 0], [-20, 240, 0], [-80, 170, 2], [-60, 60, 0]],
+      feats: [['fruits', .05, 0], ['boxes', .16], ['ramp', .1], ['fruits', .3, 3], ['pad', .42, -3], ['boxes', .5], ['fruits', .66, -3], ['boxes', .8], ['pad', .9, 0]] },
+    { id: 'giungla', name: 'Giungla Liane', theme: 'giungla', cup: 0, width: 16,
+      pts: [[0, 0, 0], [120, -20, 4], [200, 30, 8], [180, 110, 6], [100, 130, 2], [60, 200, 0], [130, 270, 4], [240, 260, 8], [300, 180, 10], [330, 60, 6], [280, -60, 2], [150, -110, 0], [30, -90, 0], [-40, -40, 0]],
+      feats: [['fruits', .04, 0], ['boxes', .14], ['fruits', .3, 3], ['boxes', .42], ['pad', .55, 0], ['boxes', .7], ['fruits', .82, -3], ['pad', .93, 0]] },
+    { id: 'castello', name: 'Castello di Dino', theme: 'castello', cup: 0, width: 16,
+      pts: [[0, 0, 0], [160, 0, 0], [200, 40, 2], [200, 160, 6], [160, 200, 6], [60, 200, 4], [20, 240, 2], [-80, 240, 0], [-120, 180, 0], [-120, 60, 0], [-80, 10, 0]],
+      feats: [['fruits', .05, 0], ['boxes', .18], ['pad', .3, 0], ['fruits', .4, 3], ['boxes', .5], ['fruits', .62, -3], ['boxes', .78], ['pad', .9, 0]] },
+    { id: 'neve', name: 'Monte Neve', theme: 'neve', cup: 1, width: 17,
+      pts: [[0, 0, 0], [140, 20, 10], [240, 100, 22], [250, 220, 30], [160, 300, 24], [40, 280, 14], [-30, 200, 8], [20, 120, 6], [-40, 60, 2], [-60, 0, 0]],
+      feats: [['fruits', .05, 0], ['boxes', .15], ['fruits', .32, -3], ['boxes', .45], ['ramp', .56], ['fruits', .66, 3], ['boxes', .76], ['pad', .88, 0]] },
+    { id: 'vulcano', name: 'Vulcano Ruggente', theme: 'vulcano', cup: 1, width: 16,
+      pts: [[0, 0, 0], [100, -40, 2], [220, -20, 6], [280, 80, 10], [220, 170, 8], [130, 150, 4], [90, 230, 6], [160, 310, 10], [40, 360, 6], [-80, 300, 2], [-100, 180, 0], [-60, 80, 0]],
+      feats: [['fruits', .04, 0], ['boxes', .12], ['pad', .25, 0], ['boxes', .4], ['fruits', .5, 3], ['boxes', .64], ['ramp', .74], ['fruits', .84, -3], ['boxes', .92]] },
+    { id: 'dolci', name: 'Fabbrica di Dolci', theme: 'dolci', cup: 1, width: 16,
+      pts: [[0, 0, 0], [80, -60, 0], [200, -60, 4], [260, 20, 8], [200, 90, 8], [260, 160, 6], [200, 240, 4], [80, 230, 2], [20, 160, 0], [-60, 140, 0], [-80, 60, 0]],
+      feats: [['fruits', .05, 0], ['boxes', .16], ['pad', .3, 0], ['boxes', .44], ['fruits', .55, 3], ['boxes', .68], ['pad', .8, 0], ['fruits', .9, -3]] },
+    { id: 'arcobaleno', name: 'Pista Arcobaleno', theme: 'arcobaleno', cup: 1, width: 15,
+      pts: [[0, 0, 0], [180, -20, 8], [300, 60, 20], [320, 200, 30], [220, 300, 26], [80, 280, 16], [-20, 200, 12], [-80, 100, 6], [-60, 20, 2]],
+      feats: [['fruits', .05, 0], ['boxes', .14], ['ramp', .3], ['boxes', .42], ['pad', .52, 0], ['fruits', .6, 3], ['boxes', .7], ['ramp', .8], ['pad', .92, 0]] }
   ];
+  var CUPS = [{ name: 'Coppa Frutta', tracks: [0, 1, 2, 3] }, { name: 'Coppa Stella', tracks: [4, 5, 6, 7] }];
 
-  G.kartTracks = function () { return TRACKS; };
-
-  var segs = [];
-  var trackLen = 0;
-
-  function buildTrack(t) {
-    segs.length = 0;
-    COL = t.col;
-    var i, j, p, n;
-    for (i = 0; i < t.plan.length; i++) {
-      p = t.plan[i];
-      n = p[1];
-      for (j = 0; j < n; j++) {
-        /* Ease the curve in and out over the piece, so a bend arrives instead of
-           snapping on: a hard step in `curve` reads as the road teleporting. */
-        var k = j / n;
-        var ease = Math.sin(k * Math.PI);
-        segs.push({
-          i: segs.length,
-          curve: p[2] * ease,
-          y: 0,
-          hill: p[3] * ease
-        });
-      }
-    }
-    // integrate the hills into absolute heights
-    var y = 0;
-    for (i = 0; i < segs.length; i++) {
-      y += segs[i].hill;
-      segs[i].y = y;
-    }
-    /* Close the loop in height: a track whose end is 400 units above its start
-       shows a cliff at the finish line. Spread the error backwards. */
-    var drift = segs[segs.length - 1].y;
-    for (i = 0; i < segs.length; i++) segs[i].y -= drift * (i / (segs.length - 1));
-    trackLen = segs.length * SEG_LEN;
-    for (i = 0; i < segs.length; i++) {
-      segs[i].dark = Math.floor(i / 3) % 2 === 0;
-    }
+  /* ------------------------------------------------------------ geometry */
+  function cr(p0, p1, p2, p3, t) {
+    var t2 = t * t, t3 = t2 * t;
+    return p1.map(function (_, k) { return .5 * (2 * p1[k] + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3); });
   }
-
-  /* ------------------------------------------------------------- the map */
-  /* THE TRACK HAS NO SHAPE. That is the whole trick of a segment renderer: the
-     road never bends in world space, each segment just carries a sideways
-     offset. So to draw a map there is nothing to copy — the shape has to be
-     INVENTED from the curve list, by walking a heading.
-
-     Two cheats make it close into a loop. The heading step is scaled so the
-     total turning around the lap comes to exactly one full circle; and whatever
-     position error is left at the end is spread backwards over every point, the
-     same trick already used to stop the hills from ending on a cliff. The
-     result is not the track — there is no track — but it is the same shape the
-     driver feels, which is what a map is for. */
-  var mapPts = [];
-  function buildMap() {
-    mapPts.length = 0;
-    var i, total = 0;
-    for (i = 0; i < segs.length; i++) total += segs[i].curve;
-    var k = Math.abs(total) > 1e-6 ? (Math.PI * 2) / total : 0;
-    var h = 0, x = 0, y = 0;
-    for (i = 0; i < segs.length; i++) {
-      h += segs[i].curve * k;
-      x += Math.sin(h);
-      y += Math.cos(h);
-      mapPts.push([x, y]);
+  function sample(T) {
+    if (T.S) return T.S;
+    var P = T.pts, n = P.length, dense = [], i, k;
+    for (i = 0; i < n; i++) for (k = 0; k < 40; k++) dense.push(cr(P[(i - 1 + n) % n], P[i], P[(i + 1) % n], P[(i + 2) % n], k / 40));
+    dense.push(dense[0]);
+    // resample by arc length
+    var xs = [], zs = [], ys = [], left = 0;
+    xs.push(dense[0][0]); zs.push(dense[0][1]); ys.push(dense[0][2]);
+    for (i = 0; i < dense.length - 1; i++) {
+      var a = dense[i], b = dense[i + 1], seg = Math.hypot(b[0] - a[0], b[1] - a[1]), t = 0;
+      while (seg - t >= STEP - left) { t += STEP - left; left = 0; var f = t / seg; xs.push(a[0] + (b[0] - a[0]) * f); zs.push(a[1] + (b[1] - a[1]) * f); ys.push(a[2] + (b[2] - a[2]) * f); }
+      left += seg - t;
     }
-    var n = mapPts.length;
-    var ex = mapPts[n - 1][0], ey = mapPts[n - 1][1];
-    for (i = 0; i < n; i++) {
-      mapPts[i][0] -= ex * (i / (n - 1));
-      mapPts[i][1] -= ey * (i / (n - 1));
-    }
-    // normalise into 0..1 with the aspect kept, so a long thin track stays long and thin
-    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (i = 0; i < n; i++) {
-      if (mapPts[i][0] < x0) x0 = mapPts[i][0];
-      if (mapPts[i][0] > x1) x1 = mapPts[i][0];
-      if (mapPts[i][1] < y0) y0 = mapPts[i][1];
-      if (mapPts[i][1] > y1) y1 = mapPts[i][1];
-    }
-    var span = Math.max(x1 - x0, y1 - y0) || 1;
-    var cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    for (i = 0; i < n; i++) {
-      mapPts[i][0] = 0.5 + (mapPts[i][0] - cx) / span;
-      mapPts[i][1] = 0.5 + (mapPts[i][1] - cy) / span;
-    }
+    if (Math.hypot(xs[xs.length - 1] - xs[0], zs[zs.length - 1] - zs[0]) < STEP * .6) { xs.pop(); zs.pop(); ys.pop(); }
+    var N = xs.length, th = [], cv = [], bank = [];
+    for (i = 0; i < N; i++) { var j = (i + 1) % N; th.push(Math.atan2(zs[j] - zs[i], xs[j] - xs[i])); }
+    for (i = 0; i < N; i++) { var d = th[(i + 1) % N] - th[i]; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; cv.push(d / STEP); }
+    // smooth curvature, then the racing line hugs the inside of each bend a little before it
+    var sc = cv.map(function (_, i) { var s = 0; for (var k = -12; k <= 12; k++) s += cv[(i + k + N) % N]; return s / 25; });
+    var line = sc.map(function (_, i) { var s = 0; for (var k = 0; k <= 16; k++) s += sc[(i + k) % N]; return G.clamp(s / 17 * 260, -1, 1); });
+    for (i = 0; i < N; i++) bank.push(G.clamp(sc[i] * 6, -.12, .12));
+    T.S = { N: N, L: N * STEP, x: xs, z: zs, y: ys, th: th, cv: sc, line: line, bank: bank };
+    return T.S;
   }
-
-  /* Where on the map somebody who has covered `d` units of track is. */
-  var mapHit = [0, 0];
-  function mapAt(d) {
-    var n = mapPts.length;
-    if (!n) { mapHit[0] = 0.5; mapHit[1] = 0.5; return mapHit; }
-    var s = wrapZ(d) / SEG_LEN;
-    var i = Math.floor(s) % n, t = s - Math.floor(s);
-    var a = mapPts[i], b = mapPts[(i + 1) % n];
-    mapHit[0] = a[0] + (b[0] - a[0]) * t;
-    mapHit[1] = a[1] + (b[1] - a[1]) * t;
-    return mapHit;
+  /* the state of the track at arc length s (wraps) */
+  function at(T, s) {
+    var S = sample(T), f = ((s % S.L) + S.L) % S.L / STEP, i = Math.floor(f), j = (i + 1) % S.N, u = f - i;
+    var dth = S.th[j] - S.th[i]; while (dth > Math.PI) dth -= 2 * Math.PI; while (dth < -Math.PI) dth += 2 * Math.PI;
+    return { x: S.x[i] + (S.x[j] - S.x[i]) * u, z: S.z[i] + (S.z[j] - S.z[i]) * u, y: S.y[i] + (S.y[j] - S.y[i]) * u, th: S.th[i] + dth * u, cv: S.cv[i], line: S.line[i], bank: S.bank[i], i: i };
   }
-
-  function segAt(z) {
-    return segs[Math.floor(wrapZ(z) / SEG_LEN) % segs.length];
+  function world(T, s, d, lift) {
+    var p = at(T, s), rx = -Math.sin(p.th), rz = Math.cos(p.th);
+    return [p.x + rx * d, p.y + p.bank * d + (lift || 0), p.z + rz * d];
   }
-  function wrapZ(z) {
-    z %= trackLen;
-    return z < 0 ? z + trackLen : z;
-  }
-
-  /* ---------------------------------------------------------------- state */
-  var S = {
-    z: 0,            // how far along the track, world units
-    x: 0,            // sideways position: -1 = left edge, +1 = right edge
-    spd: 0,
-    steer: 0,        // -1..1, what the finger is asking for
-    track: 0,
-    off: 0,          // 0..1, how long we have been off the road
-    leanShown: 0,    // the lean actually drawn, eased behind the input
-    boost: 0,
-    dist: 0,         // total distance covered, for lap and placing
-    phase: 'via',    // 'via' = countdown | 'gara' | 'fine'
-    t: 0,            // seconds in the current phase
-    lapT: 0, best: 0, lapShown: 0,
-    place: 6, laps: 3, lap: 1, lit: -1, newBest: false, farX: 640,
-    rivalScale: 1,
-    ammo: null,      // l arma che porto, una sola
-    armaFlash: 0, flash: 0,
-    drift: 0,        // seconds held at full lock in a bend
-    took: 0,         // boxes collected this race, for the results screen
-    shield: 0,       // auto-used bubble: one less thing for small hands to press
-    bump: 0,         // short visual wobble after a soft contact
-    impacts: 0, shieldBlocks: 0,
-    order: null,
-    raceT: 0,        // race clock, used to freeze an exact finish order
-    finishAt: null
-  };
-
-  /* SLOWER ON PURPOSE. "Per me si può anche muovere più lentamente" — and he is
-     right: at 12000 a lap went by in twenty seconds and there was no time to
-     look at anything, which is half of why the race felt empty. A slower kart
-     also means a corner takes longer to drive THROUGH, so the outward push has
-     longer to work on you: the track got harder, not easier, and the balance
-     was re-simulated after the change rather than assumed. */
-  var MAX_SPD = 9000;            // world units per second
-  var OFF_SPD = MAX_SPD * 0.38;  // top speed on the grass
-  var ACCEL = MAX_SPD * 0.62;    // per second
-  var BRAKE = MAX_SPD * 1.30;    // per second when off the road
-  /* THESE TWO NUMBERS ARE THE GAME, and they were found by simulation, not by
-     taste. Three drivers were raced on the real code: one who corrects early,
-     one who corrects only at the last moment, and one who NEVER TOUCHES THE
-     SCREEN. At 1.0 and 0.125 the passive one finished first, on the tarmac the
-     whole way, having done precisely nothing — which is not a racing game, it
-     is a screensaver, and it is the same fault that got Il Girotondo demoted.
-     At 1.35 and 0.30 he spends 39% of the race in the grass and finishes last,
-     while both drivers who steer stay clean and win. That is the gradient a
-     racing game needs: doing nothing has to cost you.
-     The ceiling on CENTRIF is the other half — see the assertion in the smoke
-     test. Full lock must out-pull the sharpest bend, or the road cannot be held
-     at all and no amount of skill answers that. */
-  var STEER_RATE = 1.35;         // road-widths per second at full lock, full speed
-  var CENTRIF = 0.30;            // outward push per unit of curve
-  var BOOST_MUL = 1.30;          // how much faster than flat out a boost makes you
-  /* SECONDS OF LOCK FOR THE SMALL AND BIG BOOST, and they are DERIVED, not
-     chosen. At full lock the kart crosses the road in 2/STEER_RATE seconds and
-     the charge dies the moment a wheel touches grass, so that crossing is the
-     entire budget — the thresholds have to sit inside it.
-     I got this wrong twice. First with 1.2 and 2.4, which made the big boost
-     literally unreachable. Then I fixed it to 0.7 and 1.5 by hand, and later
-     raised STEER_RATE from 1.0 to 1.35 for a completely unrelated reason, which
-     shortened the crossing to 1.48s and quietly broke it again — the smoke test
-     caught it charging to 1.42 and stopping. Tying them to STEER_RATE means the
-     next person to touch the steering cannot break the drift without noticing. */
-  var CROSS = 2 / STEER_RATE;
-  var DRIFT_1 = CROSS * 0.34, DRIFT_2 = CROSS * 0.68;
-
-  /* Roadside objects. They do almost nothing mechanically and they are the whole
-     reason a corner feels fast: with an empty verge, a road that scrolls at
-     12000 units a second and one that scrolls at 4000 look nearly identical.
-     Placed once per track, at a fixed side offset. */
-  var props = [], propsBySegment = [];
-  function buildProps(t) {
-    props.length = 0; propsBySegment = [];
-    var i, n = Math.floor(segs.length / 4);
-    for (i = 0; i < n; i++) {
-      var si = i * 4 + (i % 3);
-      if (si >= segs.length) break;
-      var side = (i % 2 ? 1 : -1);
-      props.push({
-        seg: si,
-        x: side * (1.85 + ((i * 37) % 11) / 11 * 1.6),
-        kind: (i % 5 === 0) ? 'cartello' : (t.prop || 'albero'),
-        h: 900 + ((i * 53) % 7) * 130
-      });
-      (propsBySegment[si] || (propsBySegment[si] = [])).push(props[props.length - 1]);
-    }
-  }
-
-  /* ----------------------------------------------------------- item boxes */
-  /* Three across the road, so grabbing one is nearly free — which is the point
-     at three years old. What is inside is always the same thing, a shove of
-     speed, and that is deliberate: an inventory needs a button, a button needs
-     a finger, and both fingers are already busy steering. The reward is
-     immediate and needs no explaining, which is the only kind that works here.
-
-     SPACING IS A BALANCE NUMBER, not a decoration. The first pass put a row
-     every 62 segments — one about every second at racing speed, against a boost
-     that lasts 1,1s. That is not a power-up, that is a permanent 30% pay rise:
-     the rivals top out at flat out and would never see you again. Every 120
-     segments means roughly one row every two seconds, so you are boosting about
-     half the time — and the rivals take them too, so the sums still add up. */
-  /* ---------------------------------------------------------------- armi */
-  /* "La cosa divertente è sparargli roba, non andare più veloce senza nessuno
-     da vedere." Quindi: dentro le casse non c'è più solo la spinta, ci sono
-     tre cose da tirare addosso a chi ti sta davanti.
-
-     Tutte e tre fanno la stessa cosa in modi diversi — rallentano qualcuno per
-     un paio di secondi — e la differenza è COME arrivano, che è quello che un
-     bambino guarda. Il cocco lo devi mirare, le api arrivano da sole, il
-     fulmine li prende tutti. Se ne porta una alla volta: niente inventario,
-     niente scelta, niente da spiegare.
-
-     Non c'è nessun oggetto che ti difende, perché per ora gli avversari non
-     tirano niente. Prima deve essere divertente sparare; poi si vedrà se è
-     divertente essere colpiti. */
-  var ARMI = {
-    turbo:   { nome: 'TURBO',   col: '#ffd75e', dice: 'Turbo!' },
-    cocco:   { nome: 'COCCO',   col: '#a4703c', dice: 'Cocco!' },
-    api:     { nome: 'API',     col: '#ffe066', dice: 'Le api!' },
-    fulmine: { nome: 'FULMINE', col: '#7fd7ff', dice: 'Fulmine!' },
-    scudo:   { nome: 'BOLLA',   col: '#8de9ff', dice: 'Bolla!' }
-  };
-  /* Pesato: il turbo esce spesso perché è quello che funziona anche quando sei
-     solo in testa, e il fulmine di rado perché prende tutti in una volta. */
-  var PESI = ['turbo', 'turbo', 'turbo', 'scudo', 'scudo', 'cocco', 'cocco', 'cocco', 'api', 'api', 'fulmine'];
-  var bullets = [];
-
-  var boxes = [];
-  function buildBoxes() {
-    boxes.length = 0;
-    var i, k;
-    for (i = 80; i < segs.length - 30; i += 120) {
-      for (k = -1; k <= 1; k++) boxes.push({ seg: i, x: k * 0.55, cool: 0 });
-    }
-  }
-
-  /* Puddles are the first Crash-Kart obstacle: big, slow and placed where a
-     child can see and avoid them. Piccolo gets them near the edge; Grande gets
-     a few closer to the racing line. They nudge and slow, never spin or reset. */
-  var obstacles = [];
-  function buildObstacles() {
-    obstacles.length = 0;
-    var grand = !G.account || G.account.level === 2;
-    var i, side;
-    for (i = 170; i < segs.length - 45; i += 210) {
-      side = (Math.floor(i / 210) % 2 ? 1 : -1);
-      obstacles.push({ seg: i, x: side * 0.68, cool: 0, kind: 'pozza' });
-      if (grand && (Math.floor(i / 210) % 3 === 1)) {
-        obstacles.push({ seg: i + 34, x: side * 0.34, cool: 0, kind: 'pozza' });
-      }
-    }
-  }
-
-  /* --------------------------------------------------------------- rivals */
-  /* Five of them, and they are meant to WIN if you drive badly. This is the one
-     place Dino Kart parts company with Dino Giungla: there the friends stopped
-     to eat blackberries so nobody could ever be last. Here they race.
-
-     What keeps it fair rather than cruel is the racing line: they hug the inside
-     of a bend, which is genuinely faster, and if you learn to do the same you
-     beat them. Nothing about their speed is secretly tied to yours. */
-  /* THREE OF THEM ARE FASTER THAN YOU, and that reverses a rule I had written
-     down twice and defended: "nessun avversario e piu veloce di te a tavoletta".
-     It was the right rule for a race decided on pace and the wrong rule for
-     this game, and one number settled it — with the whole field slower than a
-     clean driver, the fraction of the race spent with SOMEBODY IN FRONT OF YOU
-     was three percent. The catch-up band could not fix it either: it pulls a
-     rival towards your pace, so if his pace is below yours it parks him just
-     BEHIND your bumper, forever. To have someone ahead, someone has to be
-     quicker.
-     What stops that being unfair is the ceiling on the other side: a rival who
-     is AHEAD of you never exceeds flat out. So the quick ones sit in front, in
-     view, a few seconds up the road — and cannot drive away from you. Passing
-     them is not a matter of pace, it is a matter of the drift boost, the crates
-     and, from now on, of what you throw at them. Which is the game. */
-  var RIVALS = [
-    { name: 'Pippi', color: '#ff6fae', skill: 0.94 },
-    { name: 'Bubu', color: '#4d80e4', skill: 0.98 },
-    { name: 'Momo', color: '#ffd75e', skill: 1.02 },
-    { name: 'Nina', color: '#38d9a9', skill: 1.06 },
-    { name: 'Rufo', color: '#ff9f43', skill: 1.10 }
-  ];
-  var rivals = [];
-  var steerPointer = null, touchSteer = 0, keys = {left:false,right:false};
-  function applySteering(){S.steer=keys.left||keys.right?(Number(keys.right)-Number(keys.left)):touchSteer;}
-  function clearSteering(){keys.left=keys.right=false;touchSteer=0;steerPointer=null;S.steer=0;}
-  window.addEventListener('keydown',function(e){
-    if(G.current!=='pista'||S.phase==='fine'||(G.overlayOpen&&G.overlayOpen()))return;
-    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();keys[e.key==='ArrowLeft'?'left':'right']=true;applySteering();}
-    if(e.code==='Space'||e.key===' '){e.preventDefault();if(!e.repeat&&S.phase==='gara')shoot();}
-  });
-  window.addEventListener('keyup',function(e){
-    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){keys[e.key==='ArrowLeft'?'left':'right']=false;if(G.current==='pista'){e.preventDefault();applySteering();}}
-    if(G.current==='pista'&&(e.code==='Space'||e.key===' '))e.preventDefault();
-  });
-  window.addEventListener('blur',clearSteering);
-  document.addEventListener('visibilitychange',function(){if(document.hidden)clearSteering();});
-
-  /* THE STARTING GRID, and it is the fix for the biggest complaint this game
-     has had: "la cosa divertente è sparargli roba, non andare più veloce senza
-     nessuno da vedere". There was nobody to see, and it was not bad luck — the
-     rivals were placed BEHIND the player at the start, and the segment renderer
-     only ever draws what is in front of the camera. So the field was literally
-     invisible until it overtook you, and after that it was a row of dots on the
-     horizon. You spent a whole race alone.
-     Now they line up ahead in three staggered rows, you start at the back, and
-     the moment the lights come on there are five karts filling the screen. */
-  var GRID = [
-    { z: 5.4, x: -0.42 }, { z: 5.4, x: 0.42 },
-    { z: 3.6, x: -0.42 }, { z: 3.6, x: 0.42 },
-    { z: 1.8, x: -0.42 }
-  ];
-
-  function buildRivals() {
-    rivals.length = 0;
-    for (var i = 0; i < RIVALS.length; i++) {
-      var r = RIVALS[i];
-      var g = GRID[i] || { z: 2, x: 0 };
-      rivals.push({
-        name: r.name, color: r.color, skill: r.skill, style: i,
-        /* dist counts as raced from the very start line, grid slot included, so
-           the board reads 6/6 on the lights — you ARE last, you are at the back
-           of the grid — and it goes on telling the truth from there. The head
-           start it hands them is a tenth of a second in a race of sixty. */
-        z: wrapZ(g.z * SEG_LEN),
-        dist: g.z * SEG_LEN,
-        x: g.x,
-        spd: 0,
-        boost: 0, bcool: 0, hit: 0, finishAt: null,
-        wob: i * 1.7
-      });
-    }
-  }
-
-  function updateRivals(dt, frameStart) {
-    var i, r, here, want, top, dxp, goal = S.laps * trackLen;
-    for (i = 0; i < rivals.length; i++) {
-      r = rivals[i];
-      // A crossed finish line is a snapshot, not a place to keep accumulating.
-      if (r.finishAt !== null) continue;
-      here = segAt(r.z);
-
-      /* THEY TAKE THE BOXES TOO. Without this the power-ups are not a mechanic,
-         they are a handicap handed to the player once a lap: a 30% boost half
-         the time against a field that tops out at flat out is a race nobody else
-         can be in. They are opponents, so they get the same road. */
-      r.boost = Math.max(0, r.boost - dt);
-      r.bcool = Math.max(0, r.bcool - dt);
-      r.hit = Math.max(0, r.hit - dt);
-      if (r.bcool <= 0 && Math.abs(r.x) < 1) {
-        for (var b = 0; b < boxes.length; b++) {
-          var bd = wrapDelta(r.z, boxes[b].seg * SEG_LEN);
-          if (bd > -SEG_LEN * 1.5 && bd < SEG_LEN * 1.5 && Math.abs(boxes[b].x - r.x) < 0.32) {
-            r.boost = 1.1; r.bcool = 2.2; break;
-          }
-        }
-      }
-
-      top = MAX_SPD * r.skill * (S.rivalScale || 1)
-        * (Math.abs(r.x) < 1 ? 1 : 0.38) * (r.boost > 0 ? BOOST_MUL : 1);
-
-      /* IL GRUPPO RESTA IN VISTA, and yes, this is rubber-banding, which I had
-         explicitly refused to do — "nothing about their speed is secretly tied
-         to yours". That principle was right about fairness and wrong about the
-         game: a field that spreads out over a lap leaves a five-year-old alone
-         on an empty road with nothing to chase and nothing to shoot at, which
-         is a driving exercise, not a race.
-         So: whoever is a long way AHEAD eases off noticeably, whoever is a long
-         way behind pushes on a little. The two halves are deliberately
-         lopsided, and there is a hard ceiling underneath — nobody exceeds flat
-         out without a power-up. Drive perfectly and you still cannot be passed
-         on pace; the pack simply stays close enough to be a race. */
-      var gap = r.dist - S.dist;
-      var reach = trackLen * 0.075;
-      if (gap > 0) top *= 1 - Math.min(1, gap / reach) * 0.24;
-      else top *= 1 + Math.min(1, -gap / reach) * 0.24;
-
-      /* AND A RIVAL BEHIND IS ALLOWED TO GO FASTER THAN FLAT OUT. That was the
-         last cap standing between this and a race, and it took a number to see
-         it: with the ceiling on, the fraction of the race with SOMEBODY IN
-         FRONT OF YOU was three percent. Ninety-seven percent of a lap alone on
-         an empty road, which is precisely the complaint — "non andare più
-         veloce senza nessuno da vedere". Nothing could catch a clean driver, so
-         the moment you took the lead the game ended and kept playing.
-         Driving badly still loses, and by a mile: the band tops out at +24%,
-         and a kart on the grass runs at 38%. It cannot rescue anybody. What it
-         does is keep five karts within sight, which is the difference between a
-         race and a time trial. */
-      if (gap > 0) top = Math.min(top, MAX_SPD * (r.boost > 0 ? BOOST_MUL : 1));
-
-      /* E se l'ho colpito, arranca — DOPO la banda di recupero, non prima.
-         Applicarlo prima l'avrebbe fatto rientrare fra le braccia della banda,
-         che avrebbe restituito quasi tutto quello che il colpo aveva tolto:
-         tirargli il cocco sarebbe stato uno spettacolo senza conseguenze. */
-      if (r.hit > 0) top *= 0.34;
-      r.spd += G.clamp(top - r.spd, -BRAKE * dt, ACCEL * dt);
-      r.spd = G.clamp(r.spd, 0, MAX_SPD * BOOST_MUL);
-
-      /* Aim for the inside of the bend: on a right-hander the fast line is to
-         the right. Wander a little so five karts are not one kart drawn five
-         times. */
-      want = here.curve * [0.16, 0.08, 0.12, 0.05, 0.20][r.style]
-        + Math.sin(G.t * [0.45, 0.7, 0.35, 0.9, 0.55][r.style] + r.wob) * [0.12, 0.24, 0.10, 0.30, 0.16][r.style];
-      want = G.clamp(want, -0.82, 0.82);
-
-      // give the player room rather than shunting him: they are opponents, not obstacles
-      dxp = wrapDelta(r.z, S.z);
-      if (Math.abs(dxp) < SEG_LEN * 2 && Math.abs(r.x - S.x) < 0.42) {
-        want += (r.x >= S.x ? 1 : -1) * 0.5;
-      }
-      r.x += G.clamp(want - r.x, -dt * 1.6, dt * 1.6);
-      r.x = G.clamp(r.x, -OFF_MAX, OFF_MAX);
-
-      var rStep = r.spd * dt;
-      if (r.dist + rStep >= goal) {
-        var part = rStep > 0 ? (goal - r.dist) / rStep : 0;
-        r.z = wrapZ(r.z + rStep * part);
-        r.dist = goal;
-        r.finishAt = frameStart + dt * G.clamp(part, 0, 1);
-        r.spd = 0;
-      } else {
-        r.z = wrapZ(r.z + rStep);
-        r.dist += rStep;
-      }
-    }
-  }
-
-  /* Collecting is by DISTANCE, not by segment index, and that matters: flat out
-     a frame covers a whole segment, so "am I standing on the box's segment?"
-     would miss it about as often as it hit. A window three segments wide cannot
-     be jumped. */
-  function takeBoxes(dt) {
-    var i, b, d;
-    for (i = 0; i < boxes.length; i++) {
-      b = boxes[i];
-      if (b.cool > 0) { b.cool -= dt; continue; }
-      d = wrapDelta(S.z, b.seg * SEG_LEN);
-      if (d > -SEG_LEN * 1.5 && d < SEG_LEN * 1.5 && Math.abs(b.x - S.x) < 0.32) {
-        b.cool = 6;
-        S.took++;
-        G.sfx('coin');
-        /* Una cassa presa mentre ne hai gia una in mano non si spreca: diventa
-           spinta. Cosi la cassa e SEMPRE una buona notizia, che a tre anni e
-           l unica regola che serve sapere. */
-        var got = S.ammo ? 'turbo' : PESI[Math.floor(G.rnd(0, PESI.length)) % PESI.length];
-        if (got === 'turbo') {
-          S.boost = Math.max(S.boost, 1.1);
-        } else if (got === 'scudo') {
-          /* The defensive bonus is automatic. It is a bright bubble around the
-             kart, not another button that can steal the steering thumb. */
-          S.shield = Math.max(S.shield, 3.4);
-          S.armaFlash = 1.1;
-          G.sfx('chime');
-          G.fx.text(W / 2, 280, 'BOLLA!', ARMI.scudo.col, 56);
-        } else {
-          S.ammo = got;
-          S.armaFlash = 1.1;
-        }
-        G.fx.burst(W / 2, H - 210, { color: ARMI[got].col, count: 12, speed: 300, lift: 160, size: 14 });
-      }
-    }
-  }
-
-  function softImpact(push, label) {
-    S.bump = Math.max(S.bump, 0.34);
-    S.impacts++;
-    S.x = G.clamp(S.x + push * 0.13, -OFF_MAX, OFF_MAX);
-    if (S.shield > 0) {
-      S.shield = Math.max(0, S.shield - 0.65);
-      S.shieldBlocks++;
-      G.sfx('pop');
-      G.fx.text(W / 2, 330, 'BOLLA!', ARMI.scudo.col, 42);
-      return true;
-    }
-    /* A bump costs a little momentum, never the steering or a whole race. */
-    S.spd = Math.max(OFF_SPD, S.spd * 0.88);
-    G.sfx('hatch');
-    G.fx.text(W / 2, 330, label || 'PLOF!', C.sun, 42);
-    return false;
-  }
-
-  function updateObstacles(dt) {
-    var i, o, d;
-    for (i = 0; i < obstacles.length; i++) {
-      o = obstacles[i];
-      o.cool = Math.max(0, o.cool - dt);
-      if (o.cool > 0) continue;
-      d = wrapDelta(S.z, o.seg * SEG_LEN);
-      if (d > -SEG_LEN * 0.62 && d < SEG_LEN * 0.62 && Math.abs(S.x - o.x) < 0.30) {
-        o.cool = 1.2;
-        softImpact(S.x <= o.x ? -1 : 1, 'POZZA!');
-      }
-    }
-  }
-
-  function resolveRivalContacts(dt) {
-    var i, r, dz, push;
-    for (i = 0; i < rivals.length; i++) {
-      r = rivals[i];
-      r.impact = Math.max(0, (r.impact || 0) - dt);
-      if (r.impact > 0 || r.finishAt !== null) continue;
-      dz = wrapDelta(S.z, r.z);
-      if (Math.abs(dz) >= SEG_LEN * 0.52 || Math.abs(S.x - r.x) >= 0.36) continue;
-      r.impact = 0.65;
-      push = S.x <= r.x ? -1 : 1;
-      /* The other kart pays too: nobody gets to ram a child for free. */
-      r.spd *= S.shield > 0 ? 0.78 : 0.90;
-      r.x = G.clamp(r.x - push * 0.12, -OFF_MAX, OFF_MAX);
-      softImpact(push, 'BUM!');
-    }
-  }
-
-  /* SPARARE. Un solo colpo, quello che hai in mano, e parte sempre in avanti —
-     non si mira, non si sceglie, non si tiene premuto. Il bersaglio interessante
-     e sempre davanti, perche chi e dietro non ti da fastidio. */
-  function shoot() {
-    if (!S.ammo) return;
-    var kind = S.ammo;
-    S.ammo = null;
-
-    if (kind === 'fulmine') {
-      /* Nessun proiettile: prende in una volta tutti quelli davanti a te. E
-         l arma dei disperati, quella che ti rimette in gioco quando sei ultimo,
-         ed e apposta la piu rara. */
-      var i, colpiti = 0;
-      for (i = 0; i < rivals.length; i++) {
-        if (rivals[i].dist > S.dist) { rivals[i].hit = Math.max(rivals[i].hit, 1.6); colpiti++; }
-      }
-      S.flash = 0.45;
-      G.sfx(colpiti ? 'win' : 'bad');
-      G.fx.text(W / 2, 300, colpiti ? 'FULMINE!' : 'sei in testa!', C.sun, 56);
-      return;
-    }
-
-    bullets.push({
-      kind: kind,
-      z: wrapZ(S.z + SEG_LEN * 0.5),
-      x: S.x,
-      // le api inseguono chi ho davanti, il cocco vola dritto e lo devi mirare
-      target: kind === 'api' ? nearestAhead() : -1,
-      spd: MAX_SPD * (kind === 'api' ? 1.45 : 1.9),
-      life: 4.5,
-      wob: 0
-    });
-    // Speech synthesis can hitch lower-end Android devices. The flying object,
-    // sound and hit feedback already say exactly what happened.
-    G.sfx('whoosh');
-  }
-
-  function nearestAhead() {
-    var i, best = -1, bd = 1e9, d;
-    for (i = 0; i < rivals.length; i++) {
-      d = wrapDelta(S.z, rivals[i].z);
-      if (d > 0 && d < bd) { bd = d; best = i; }
+  /* closest distance between two parts of the track that are far apart along it:
+     a track must never cross or touch itself */
+  function selfGap(T) {
+    var S = sample(T), best = 1e9, stride = 3;
+    for (var i = 0; i < S.N; i += stride) for (var j = i + 40; j < S.N; j += stride) {
+      var along = Math.min(j - i, S.N - (j - i)) * STEP; if (along < 90) continue;
+      var dd = Math.hypot(S.x[i] - S.x[j], S.z[i] - S.z[j]); if (dd < best) best = dd;
     }
     return best;
   }
 
-  function updateBullets(dt) {
-    var i, j, b, r, d, tx;
-    for (i = bullets.length - 1; i >= 0; i--) {
-      b = bullets[i];
-      b.life -= dt;
-      b.wob += dt;
-      b.z = wrapZ(b.z + b.spd * dt);
-
-      if (b.target >= 0 && rivals[b.target]) {
-        // le api curvano verso il bersaglio invece di sperare
-        tx = rivals[b.target].x;
-        b.x += G.clamp(tx - b.x, -dt * 2.2, dt * 2.2);
-      }
-
-      var colpito = false;
-      for (j = 0; j < rivals.length; j++) {
-        r = rivals[j];
-        d = wrapDelta(b.z, r.z);
-        if (d > -SEG_LEN * 1.3 && d < SEG_LEN * 1.3 && Math.abs(b.x - r.x) < 0.34) {
-          r.hit = Math.max(r.hit, 2.0);
-          colpito = true;
-          G.sfx('hatch');
-          G.fx.text(W / 2, 330, 'PRESO!', C.sun, 60);
-          break;
-        }
-      }
-      if (colpito || b.life <= 0) bullets.splice(i, 1);
-    }
-  }
-
-  /* Signed shortest distance from a to b around the loop. */
-  function wrapDelta(a, b) {
-    var d = wrapZ(b - a);
-    return d > trackLen / 2 ? d - trackLen : d;
-  }
-
-  /* -------------------------------------------------------------- project */
-  /* One divide per point. `cx` is the accumulated fake curve at that segment,
-     `cy` its world height. */
-  var pr = { x: 0, y: 0, w: 0, s: 0 };
-  function project(cx, cy, cz, camX, camY, camZ) {
-    var d = cz - camZ;
-    if (d < 1) d = 1;
-    pr.s = CAM_D / d;
-    pr.x = Math.round(W / 2 + pr.s * (cx - camX) * W / 2);
-    pr.y = Math.round(HORIZON - pr.s * (cy - camY) * H / 2);
-    pr.w = Math.round(pr.s * ROAD_W * W / 2);
-    return pr;
-  }
-
-  /* Read-only window on the driving state, so the headless test can assert that
-     steering actually moves the kart. Nothing in the game reads it. */
-  /* Chi ho davanti e quanto lontano: serve al collaudo per rispondere alla sola
-     domanda che conta davvero, cioe se c'e qualcuno da vedere. */
-  G.kartAhead = function () {
-    var i, n = 0, near = 1e9, d;
-    for (i = 0; i < rivals.length; i++) {
-      d = wrapDelta(S.z, rivals[i].z);
-      if (d > 0 && d < DRAW_N * SEG_LEN) { n++; if (d < near) near = d; }
-    }
-    return { n: n, near: near };
-  };
-  G.kartSkills = function (a) {
-    for (var i = 0; i < RIVALS.length && i < a.length; i++) RIVALS[i].skill = a[i];
-  };
-  /* Read-only balance data for the smoke test and for tuning. Nominal speed is
-     deliberately monotonic: the fifth rival is never secretly weaker than the
-     first before track position, boxes and hits enter the race. */
-  G.kartRivalProfiles = function (diff) {
-    var scales = [0.97, 1.00, 1.04];
-    var scale = scales[diff] || scales[0];
-    return RIVALS.map(function (r) {
-      return { name: r.name, skill: r.skill, nominal: r.skill * scale };
+  /* ------------------------------------------------------------ features */
+  function hash(n) { n = Math.imul(n ^ 0x5bd1e995, 0x27d4eb2d); n ^= n >>> 15; return ((n >>> 0) % 10000) / 10000; }
+  function features(T) {
+    if (T.F) return T.F;
+    var S = sample(T), F = { boxes: [], fruits: [], pads: [], ramps: [] }, half = T.width / 2;
+    T.feats.forEach(function (f) {
+      var s = f[1] * S.L;
+      if (f[0] === 'boxes') [-.6, -.2, .2, .6].forEach(function (u) { F.boxes.push({ s: s, d: u * half }); });
+      if (f[0] === 'fruits') for (var k = 0; k < 6; k++) F.fruits.push({ s: s + k * 5, d: f[2] || 0 });
+      if (f[0] === 'pad') F.pads.push({ s: s, d: f[2] || 0 });
+      if (f[0] === 'ramp') F.ramps.push({ s: s, len: 7 });
     });
-  };
-
-  G.kartState = function () {
-    return {
-      x: S.x, spd: S.spd, z: S.z, steer: S.steer, off: S.off, dist: S.dist,
-      phase: S.phase, lap: S.lap, laps: S.laps, place: S.place,
-      field: rivals.length + 1, order: S.order ? S.order.length : 0,
-      orderNames: S.order ? S.order.map(function (o) { return o.name; }) : [],
-      orderTimes: S.order ? S.order.map(function (o) { return o.finishAt; }) : [],
-      lapT: S.lapT, best: S.lapShown, trackLen: trackLen,
-      steerRate: STEER_RATE, centrif: CENTRIF, maxCurve: maxCurve(),
-      drift: S.drift, boost: S.boost, took: S.took, boxes: boxes.length,
-      shield: S.shield, bump: S.bump, impacts: S.impacts,
-      shieldBlocks: S.shieldBlocks, obstacles: obstacles.length,
-      ammo: S.ammo, bullets: bullets.length, fireY: FIRE_Y,
-      hitSpd: (function () { for (var i = 0; i < rivals.length; i++) if (rivals[i].hit > 0) return rivals[i].spd; return -1; })(),
-      hits: rivals.reduce(function (a, r) { return a + (r.hit > 0 ? 1 : 0); }, 0),
-      farX: S.farX, raceT: S.raceT, finishAt: S.finishAt,
-      rivalDists: rivals.map(function (r) { return r.dist; }),
-      rivalFinishAt: rivals.map(function (r) { return r.finishAt; }),
-      maxSpd: MAX_SPD, boostMul: BOOST_MUL, drift2: DRIFT_2
-    };
-  };
-
-  /* The sharpest bend on the loaded track. The test compares it against the
-     steering to prove the road can be held at all — the bug that made the game
-     unplayable was a corner pushing outwards harder than full lock pulled in,
-     and no amount of driving skill answers that. */
-  function maxCurve() {
-    var i, m = 0;
-    for (i = 0; i < segs.length; i++) if (Math.abs(segs[i].curve) > m) m = Math.abs(segs[i].curve);
-    return m;
+    T.F = F; return F;
   }
 
-  /* ================================================================ SCENE */
-  G.scene('pista', {
-    hud: false, back: true,
+  /* ------------------------------------------------------------ the mesh */
+  function build(T) {
+    var GL = G.GL, S = sample(T), th = THEMES[T.theme], half = T.width / 2, b = new GL.Builder(), i, k, N = S.N;
+    var P = function (i, d, lift) { var x = S.x[i % N], z = S.z[i % N], a = S.th[i % N], bk = S.bank[i % N]; return [x - Math.sin(a) * d, S.y[i % N] + bk * d + (lift || 0), z + Math.cos(a) * d]; };
+    var minY = Math.min.apply(null, S.y);
+    for (i = 0; i < N; i++) {
+      var j = i + 1, band = Math.floor(i / 4) % 2;
+      // road
+      if (th.space) {
+        var lanes = 6;
+        for (k = 0; k < lanes; k++) { var d0 = -half + k * T.width / lanes, d1 = d0 + T.width / lanes; b.quad(P(i, d0), P(i, d1), P(j, d1), P(j, d0), RAINBOW[k]); b.quad(P(i, d1, -.4), P(i, d0, -.4), P(j, d0, -.4), P(j, d1, -.4), RAINBOW[k]); }
+      } else {
+        b.quad(P(i, -half), P(i, half), P(j, half), P(j, -half), th.road[band]);
+        if (Math.floor(i / 3) % 2 === 0) b.quad(P(i, -.25, .02), P(i, .25, .02), P(j, .25, .02), P(j, -.25, .02), th.line);
+      }
+      // curbs
+      var cb = th.curb[Math.floor(i / 2) % 2];
+      b.quad(P(i, half, .04), P(i, half + 1.3, .04), P(j, half + 1.3, .04), P(j, half, .04), cb);
+      b.quad(P(i, -half - 1.3, .04), P(i, -half, .04), P(j, -half, .04), P(j, -half - 1.3, .04), cb);
+      if (!th.space) {
+        // shoulders that roll gently down into the landscape
+        var g = th.ground[Math.floor(i / 6) % 2];
+        b.quad(P(i, half + 1.3), P(i, half + 14, -.6), P(j, half + 14, -.6), P(j, half + 1.3), g);
+        b.quad(P(i, -half - 14, -.6), P(i, -half - 1.3), P(j, -half - 1.3), P(j, -half - 14, -.6), g);
+        b.quad(P(i, half + 14, -.6), P(i, half + 32, -2.5), P(j, half + 32, -2.5), P(j, half + 14, -.6), g);
+        b.quad(P(i, -half - 32, -2.5), P(i, -half - 14, -.6), P(j, -half - 14, -.6), P(j, -half - 32, -2.5), g);
+        // low barriers, two-sided
+        var wc = th.wall[Math.floor(i / 2) % 2], wd = half + 4;
+        b.quad(P(i, wd), P(j, wd), P(j, wd, 1.1), P(i, wd, 1.1), wc); b.quad(P(j, wd), P(i, wd), P(i, wd, 1.1), P(j, wd, 1.1), wc);
+        b.quad(P(j, -wd), P(i, -wd), P(i, -wd, 1.1), P(j, -wd, 1.1), wc); b.quad(P(i, -wd), P(j, -wd), P(j, -wd, 1.1), P(i, -wd, 1.1), wc);
+      }
+    }
+    // the world beyond: ground, sea or lava
+    if (!th.space) {
+      var cx = S.x.reduce(function (a, v) { return a + v; }, 0) / N, cz = S.z.reduce(function (a, v) { return a + v; }, 0) / N, R = 1400, fy = minY - (th.water ? 1.8 : 2.6);
+      b.quad([cx - R, fy, cz - R], [cx - R, fy, cz + R], [cx + R, fy, cz + R], [cx + R, fy, cz - R], th.far);
+    }
+    // start line and gantry
+    for (k = 0; k < 8; k++) for (var r = 0; r < 2; r++) { var dA = -half + k * T.width / 8; b.quad(P(r, dA, .05), P(r, dA + T.width / 8, .05), P(r + 1, dA + T.width / 8, .05), P(r + 1, dA, .05), (k + r) % 2 ? '#ffffff' : '#2b2b33'); }
+    var g0 = P(0, -half - 2), g1 = P(0, half + 2);
+    // the start gate: two posts in the track's colours and a checkered banner, high enough to see the road under it
+    var postCol = th.curb[0];
+    b.cyl(g0[0], g0[1], g0[2], .45, 9, postCol, 8); b.cyl(g1[0], g1[1], g1[2], .45, 9, postCol, 8);
+    b.push(GL.M4.mul(GL.M4.trans((g0[0] + g1[0]) / 2, g0[1] + 7, (g0[2] + g1[2]) / 2), GL.M4.rotY(-S.th[0] - Math.PI / 2)));
+    for (var cq = 0; cq < 12; cq++) for (var rq = 0; rq < 2; rq++) b.box(-(T.width + 5) / 2 + (cq + .5) * (T.width + 5) / 12, 1.8 + rq * .7 - .35, 0, (T.width + 5) / 12, .7, .5, (cq + rq) % 2 ? '#ffffff' : '#2b2b33');
+    b.pop();
+    // ramps
+    features(T).ramps.forEach(function (rp) {
+      var i0 = Math.round(rp.s / STEP), n = Math.round(rp.len / STEP);
+      for (var q = 0; q < n; q++) { var h0 = q / n * 1.6, h1 = (q + 1) / n * 1.6; b.quad(P(i0 + q, -half * .7, h0), P(i0 + q, half * .7, h0), P(i0 + q + 1, half * .7, h1), P(i0 + q + 1, -half * .7, h1), q % 2 ? '#ff9f43' : '#ffd75e'); }
+      b.quad(P(i0 + n, -half * .7, 1.6), P(i0 + n, half * .7, 1.6), P(i0 + n, half * .7, 0), P(i0 + n, -half * .7, 0), '#c97a2a');
+    });
+    // scenery: deterministic, never on the road, never on another bit of track
+    var sc = th.sc, kinds = [], grid = {};
+    Object.keys(sc).forEach(function (key) { for (var q = 0; q < sc[key]; q++) kinds.push(key); });
+    for (i = 0; i < N; i++) { var gk = Math.floor(S.x[i] / 20) + ',' + Math.floor(S.z[i] / 20); (grid[gk] = grid[gk] || []).push(i); }
+    function clear(x, z, need) {
+      var gx = Math.floor(x / 20), gz = Math.floor(z / 20);
+      for (var a = -2; a <= 2; a++) for (var c = -2; c <= 2; c++) { var L = grid[(gx + a) + ',' + (gz + c)]; if (L) for (var q = 0; q < L.length; q++) if (Math.hypot(S.x[L[q]] - x, S.z[L[q]] - z) < need) return false; }
+      return true;
+    }
+    var SC = G.models.SC;
+    for (i = 0; i < N; i += 3) for (var side = -1; side <= 1; side += 2) {
+      var hsh = hash(i * 2 + (side > 0 ? 1 : 0) + T.id.length * 977);
+      if (hsh < (th.space ? .55 : .25)) continue;
+      var dist = half + 9 + hash(i * 7 + side) * (th.space ? 70 : 20), p = P(i, side * dist), kind = kinds[Math.floor(hash(i * 13 + side * 5) * kinds.length)];
+      if (!clear(p[0], p[2], half + 6)) continue;
+      var kk = .8 + hash(i * 31 + side) * .7, dd2 = dist - half, slope = dd2 < 14 ? -.6 * (dd2 - 1.3) / 12.7 : -.6 - 1.9 * (dd2 - 14) / 18;
+      var y = th.space ? p[1] + 4 + hash(i * 17) * 26 : p[1] + slope - .1;
+      if (kind === 'snowpine') SC.pine(b, p[0], y, p[2], kk, true);
+      else if (kind === 'rock') SC.rock(b, p[0], y, p[2], kk, T.theme === 'vulcano' ? '#2a1a20' : null);
+      else if (SC[kind]) SC[kind](b, p[0], y, p[2], kind === 'planet' ? kk : kk);
+    }
+    if (T.theme === 'vulcano') SC.volcano(b, (S.x[0] + S.x[Math.floor(N / 2)]) / 2 + 260, minY - 3, (S.z[0] + S.z[Math.floor(N / 2)]) / 2 + 200, 1);
+    return GL.upload(b);
+  }
 
-    enter: function () {
-      var g = G.kartSave ? G.kartSave() : { track: 0 };
-      var d = G.kartDiff ? G.kartDiff() : { laps: 3, rivalScale: 1 };
-      S.track = Math.min(TRACKS.length - 1, g.track || 0);
-      S.laps = d.laps;
-      S.rivalScale = d.rivalScale;
+  G.tracks = { TRACKS: TRACKS, CUPS: CUPS, THEMES: THEMES, STEP: STEP, sample: sample, at: at, world: world, features: features, build: build, selfGap: selfGap, hash: hash };
+})();
 
-      buildTrack(TRACKS[S.track]);
-      buildMap();
-      buildProps(TRACKS[S.track]);
-      buildBoxes();
-      buildObstacles();
-      buildRivals();
-      S.z = 0; S.x = 0; S.spd = 0; S.steer = 0; S.off = 0;
-      S.leanShown = 0; S.boost = 0; S.dist = 0;
-      S.drift = 0; S.took = 0; S.shield = 0; S.bump = 0;
-      S.impacts = 0; S.shieldBlocks = 0;
-      S.ammo = null; S.armaFlash = 0; S.flash = 0;
-      bullets.length = 0;
-      S.phase = 'via'; S.t = 0; S.lit = -1; S.raceT = 0; S.finishAt = null;
-      S.lapT = 0; S.lapShown = 0; S.lap = 1; S.place = RIVALS.length + 1;
-      S.order = null; S.newBest = false; clearSteering();
-    },
 
-    update: function (dt) {
-      S.t += dt;
+/* ==================== 30-race.js ==================== */
+/* Dino Kart — the race, as data. No drawing here.
 
-      /* THE COUNTDOWN, and it is not decoration. Without it you were dropped
-         into a race already moving, which is the single thing that made this
-         read as a demo rather than a game: there was no moment at which it
-         began. */
-      if (S.phase === 'via') {
-        var lit = Math.min(3, Math.floor(S.t));
-        if (lit !== S.lit) {
-          S.lit = lit;
-          if (lit >= 3) { G.sfx('win'); G.say('Via!'); }
-          else if (lit >= 0) G.sfx('pop');
+   Every kart lives in track coordinates: s (metres along the centre line,
+   wrapping each lap) and d (metres to the right of it), plus its heading
+   relative to the track. That makes walls, the racing line, item boxes and
+   "who is ahead" one-line questions, and it cannot fall off a curve.
+
+   Steering, auto-drift with mini-turbos, ramps, boost pads, fruit (each one
+   adds a little top speed, up to ten), item boxes and six items, eight karts
+   with a racing line, rubber band and items of their own. S is plain data
+   with its own seeded dice, so test/smoke.js can run whole races in a blink. */
+(function () {
+  'use strict';
+  var DT = 1 / 60, TR = function () { return G.tracks; };
+  var RIVALS = [
+    { name: 'Rex', col: '#e8536b' }, { name: 'Trici', col: '#ff9f43' }, { name: 'Stego', col: '#ffd75e' }, { name: 'Ptero', col: '#8f5bd6' },
+    { name: 'Brachi', col: '#4d80e4' }, { name: 'Anchi', col: '#38d9a9' }, { name: 'Spino', col: '#ff6fae' }, { name: 'Pachi', col: '#9aa0a6' }
+  ];
+  var ITEMS = ['banana', 'verde', 'rosso', 'turbo', 'stella', 'frutti'];
+  var POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
+
+  function rnd(S) {
+    S.seed = (S.seed + 0x6D2B79F5) | 0;
+    var t = S.seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  function wrapA(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+  function track(S) { return TR().TRACKS[S.ti]; }
+
+  /* o = { ti, level (1|2), player: {name, color}, seed, laps } */
+  function create(o) {
+    var T = TR().TRACKS[o.ti], L = TR().sample(T).L, F = TR().features(T);
+    var S = { ti: o.ti, level: o.level, laps: o.laps || (o.level === 1 ? 2 : 3), t: 0, phase: 'count', count: 3.4, seed: o.seed || 7, karts: [], objs: [], events: [],
+      boxes: F.boxes.map(function (b) { return { s: b.s, d: b.d, t: 0 }; }), fruits: F.fruits.map(function (f) { return { s: f.s, d: f.d, t: 0 }; }), doneT: 0, results: null };
+    var rivals = RIVALS.filter(function (r) { return r.col.toLowerCase() !== String(o.player.color).toLowerCase(); }).slice(0, 7);
+    var skills = o.level === 1 ? [.8, .81, .82, .83, .84, .85, .86] : [.86, .875, .89, .9, .91, .92, .935];
+    var order = [0, 1, 2, 3, 4, 'P', 5, 6];      // the child starts fifth: there are karts to chase from the first second
+    var ri = 0;
+    order.forEach(function (who, slot) {
+      var row = Math.floor(slot / 2), side = slot % 2 ? 3.6 : -3.6, isP = who === 'P', r = isP ? null : rivals[ri++];
+      S.karts.push({ id: slot, name: isP ? o.player.name : r.name, col: isP ? o.player.color : r.col, ai: !isP, skill: isP ? 1 : skills[who],
+        s: L - 8 - row * 7.5, d: side, yaw: 0, v: 0, y: 0, vy: 0, air: false, drift: 0, hold: 0, charge: 0, boost: 0, spin: 0, spinA: 0, star: 0,
+        item: null, roul: 0, coins: 0, lap: -1, lapT: 0, laps: [], finished: false, ftime: 0, place: slot + 1, fall: 0, trick: false, aiOff: (rnd(S) - .5) * 3, aiHold: 0, steer: 0 });
+    });
+    S.player = 5;
+    return S;
+  }
+  function progress(S, k) { return k.lap * TR().sample(track(S)).L + k.s; }
+
+  function vmax(S, k) {
+    var v = (S.level === 1 ? 21 : 26) * (1 + .012 * k.coins);
+    if (k.ai) {
+      var P = S.karts[S.player], gap = progress(S, k) - progress(S, P);
+      // rubber band: nobody escapes for good, nobody is left behind for good
+      v *= k.skill * (1 - G.clamp(gap / 300, -.12, .05));   // behind the child: hurry; ahead: barely wait
+    }
+    if (k.boost > 0) v *= 1.38; if (k.star > 0) v *= 1.2;
+    return v;
+  }
+
+  function step(S, input) {
+    S.events.length = 0;
+    if (S.phase === 'count') { S.count -= DT; if (S.count <= 0) { S.phase = 'race'; S.events.push({ k: 'go' }); } return; }
+    S.t += DT;
+    var T = track(S);
+    S.karts.forEach(function (k) {
+      if (k.finished && !k.ai && S.phase === 'race') { /* the player's kart keeps rolling on autopilot after the line */ }
+      var c = (k.ai || k.finished) ? aiControl(S, k) : (input || {});
+      drive(S, T, k, c);
+    });
+    collide(S);
+    objects(S, T);
+    places(S);
+    S.boxes.forEach(function (b) { b.t = Math.max(0, b.t - DT); }); S.fruits.forEach(function (f) { f.t = Math.max(0, f.t - DT); });
+    var P = S.karts[S.player];
+    if (P.finished && S.phase === 'race') { S.phase = 'done'; S.doneT = 0; finishAll(S); }
+    if (S.phase === 'done') S.doneT += DT;
+  }
+
+  function drive(S, T, k, c) {
+    var Ts = TR(), p = Ts.at(T, k.s), half = T.width / 2, space = Ts.THEMES[T.theme].space, L = Ts.sample(T).L;
+    if (k.fall > 0) { k.fall -= DT; if (k.fall <= 0) { k.d = 0; k.yaw = 0; k.v = 8; k.y = 0; k.vy = 0; k.air = false; } return; }
+    var target = vmax(S, k), off = !space && Math.abs(k.d) > half + .8;
+    if (off) target *= k.boost > 0 || k.star > 0 ? .85 : .55;
+    if (space && Math.abs(k.d) > half - 1) target *= .7;          // the rainbow's edge is slow, not a wall
+    var steer = G.clamp(c.steer || 0, -1, 1);
+    // Piccolo: a hand on the wheel keeps him off the barriers, never steers the bends for him
+    if (!k.ai && S.level === 1 && Math.abs(k.d) > half + (space ? 0 : 1.5) && steer * k.d >= 0) steer = G.clamp(steer - Math.sign(k.d) * .45, -1, 1);
+    k.steer = steer;
+    var H = p.th + k.yaw;
+    if (k.spin > 0) {
+      k.spin -= DT; k.spinA += 14 * DT; k.v = Math.max(0, k.v - 30 * DT); k.drift = 0; k.charge = 0;
+    } else {
+      var rate = 1.75 * G.clamp(k.v / 12, .3, 1);
+      // auto-drift: hold the wheel all the way and the kart slides; let go for the mini-turbo
+      if (!k.drift && !k.air && !c.bot && k.v > 15 && Math.abs(steer) > .85) { k.hold += DT; if (k.hold > .2 || c.drift) { k.drift = Math.sign(steer); k.charge = 0; S.events.push({ k: 'drift', id: k.id }); } }
+      else if (!k.drift) k.hold = 0;
+      if (k.drift) {
+        if (Math.abs(steer) < .25 || k.v < 9 || off) {
+          var lvl = k.charge > 2.2 ? 3 : k.charge > 1.4 ? 2 : k.charge > .7 ? 1 : 0;
+          if (lvl) { k.boost = Math.max(k.boost, [0, .55, .9, 1.3][lvl]); S.events.push({ k: 'turbo', id: k.id, lvl: lvl }); }
+          k.drift = 0; k.hold = 0; k.charge = 0;
+        } else {
+          H += k.drift * (.9 + .6 * steer * k.drift) * DT;     // inward: tight, neutral: medium, outward: wide
+          k.charge += DT * (steer * k.drift > .5 ? 1.3 : .8);
         }
-        if (S.t >= 3.3) { S.phase = 'gara'; S.t = 0; }
-        S.spd = 0;
-        return;
+      } else H += steer * rate * DT;
+      if (k.v < target) k.v = Math.min(target, k.v + (k.boost > 0 ? 30 : 13) * DT); else k.v = Math.max(target, k.v - 18 * DT);
+    }
+    k.boost = Math.max(0, k.boost - DT); k.star = Math.max(0, k.star - DT); k.roul = Math.max(0, k.roul - DT);
+    if (k.roul === 0 && k.pending) { k.item = k.pending; k.pending = null; }
+    var slip = k.drift ? -k.drift * .45 : 0, mA = H + slip, oldS = k.s;
+    var ds = k.v * Math.cos(mA - p.th) * DT / Math.max(.4, 1 - k.d * p.cv), dd = k.v * Math.sin(mA - p.th) * DT;
+    k.s += ds; k.d += dd;
+    if (k.s >= L) { k.s -= L; k.lap++; if (k.lap > 0) { k.laps.push(S.t - k.lapT); } k.lapT = S.t; if (k.lap >= S.laps && !k.finished) { k.finished = true; k.ftime = S.t; S.events.push({ k: 'finish', id: k.id }); } else if (k.lap > 0 && !k.ai) S.events.push({ k: 'lap', lap: k.lap + 1 }); }
+    else if (k.s < 0) { k.s += L; k.lap--; }
+    var p2 = Ts.at(T, k.s);
+    k.yaw = wrapA(H - p2.th);
+    // walls, or the void on the rainbow road
+    var wall = half + 3.3;
+    if (space) { if (Math.abs(k.d) > half + 1.3 && !k.air) { k.fall = 1.4; k.v = 0; k.coins = Math.max(0, k.coins - 2); S.events.push({ k: 'fall', id: k.id }); } }
+    else if (Math.abs(k.d) > wall) {
+      k.d = Math.sign(k.d) * wall; if (k.star <= 0) k.v *= .5; k.yaw = -k.yaw * .35; k.drift = 0;   // a barrier stops you: driving by bouncing must not pay
+      S.events.push({ k: 'bump', id: k.id });
+    }
+    // ramps and air
+    var F = Ts.features(T), onRamp = null;
+    F.ramps.forEach(function (r) { if (k.s >= r.s && k.s < r.s + r.len && Math.abs(k.d) < half * .7) onRamp = r; });
+    if (k.air) {
+      k.y += k.vy * DT; k.vy -= 22 * DT;
+      if (!k.ai && c.trick) k.trick = true;
+      if (k.y <= 0) { k.y = 0; k.air = false; if (k.trick || k.ai) { k.boost = Math.max(k.boost, .7); S.events.push({ k: 'trick', id: k.id }); } k.trick = false; }
+    } else if (onRamp) { k.y = (k.s - onRamp.s) / onRamp.len * 1.6; k.rampV = k.v; }
+    else if (k.y > 0) { k.air = true; k.vy = 6 + (k.rampV || k.v) * .16; }
+    // boost pads, item boxes, fruit
+    if (!k.air) F.pads.forEach(function (pd) { if (Math.abs(k.s - pd.s) < 2.6 && Math.abs(k.d - pd.d) < 2.4) { if (k.boost < .3) S.events.push({ k: 'pad', id: k.id }); k.boost = Math.max(k.boost, 1.0); } });
+    S.boxes.forEach(function (b) {
+      if (b.t > 0 || Math.abs(k.s - b.s) > 1.8 || Math.abs(k.d - b.d) > 1.9) return;
+      b.t = 3; S.events.push({ k: 'box', id: k.id });
+      if (!k.item && !k.pending) { k.pending = pick(S, k); k.roul = k.ai ? .6 : 1.3; }
+    });
+    S.fruits.forEach(function (f) { if (f.t <= 0 && Math.abs(k.s - f.s) < 1.5 && Math.abs(k.d - f.d) < 1.7) { f.t = 14; if (k.coins < 10) k.coins++; S.events.push({ k: 'fruit', id: k.id }); } });
+    if (c.use && k.item && k.spin <= 0) useItem(S, k);
+  }
+
+  function pick(S, k) {
+    var q = (k.place - 1) / 7, w = { banana: 1.6 - q * 1.2, verde: 1.3 - q * .6, rosso: .2 + q * 1.3, turbo: .3 + q * 1.4, stella: q > .45 ? q * 1.1 : .02, frutti: .7 };
+    var tot = 0, key; for (key in w) tot += Math.max(.01, w[key]);
+    var r = rnd(S) * tot; for (key in w) { r -= Math.max(.01, w[key]); if (r <= 0) return key; }
+    return 'banana';
+  }
+  function useItem(S, k) {
+    var it = k.item; k.item = null;
+    S.events.push({ k: 'use', id: k.id, item: it });
+    if (it === 'banana') S.objs.push({ k: 'banana', s: k.s - 3.5, d: k.d, owner: k.id, life: 60 });
+    else if (it === 'verde') S.objs.push({ k: 'verde', s: k.s + 3, d: k.d, yaw: k.yaw, v: 44, bounce: 3, owner: k.id, life: 7 });
+    else if (it === 'rosso') { var tg = S.karts.filter(function (o) { return o.place === k.place - 1; })[0]; S.objs.push({ k: 'rosso', s: k.s + 3, d: k.d, v: 41, target: tg ? tg.id : -1, owner: k.id, life: 9 }); }
+    else if (it === 'turbo') k.boost = Math.max(k.boost, 1.6);
+    else if (it === 'stella') k.star = 6;
+    else if (it === 'frutti') k.coins = Math.min(10, k.coins + 3);
+  }
+  function hit(S, k, why) {
+    if (k.star > 0 || k.fall > 0) return false;
+    k.spin = 1.1; k.v *= .35; k.coins = Math.max(0, k.coins - 2); k.drift = 0; k.boost = 0;
+    S.events.push({ k: 'hit', id: k.id, why: why }); return true;
+  }
+  function near(S, a, b, ds, dd) { var L = TR().sample(track(S)).L, x = Math.abs(a.s - b.s); x = Math.min(x, L - x); return x < ds && Math.abs(a.d - b.d) < dd; }
+
+  function collide(S) {
+    var K = S.karts;
+    for (var i = 0; i < K.length; i++) for (var j = i + 1; j < K.length; j++) {
+      var a = K[i], b = K[j]; if (a.fall > 0 || b.fall > 0 || a.air !== b.air) continue;
+      if (!near(S, a, b, 2.8, 1.9)) continue;
+      if (a.star > 0 && b.star <= 0) { hit(S, b, 'star'); continue; }
+      if (b.star > 0 && a.star <= 0) { hit(S, a, 'star'); continue; }
+      var push = (1.9 - Math.abs(a.d - b.d)) / 2 + .05, sg = a.d < b.d ? -1 : 1;
+      a.d += sg * push; b.d -= sg * push;
+    }
+  }
+  function objects(S, T) {
+    var Ts = TR(), half = T.width / 2, wall = half + 3.3, L = Ts.sample(T).L;
+    for (var i = S.objs.length - 1; i >= 0; i--) {
+      var o = S.objs[i], dead = false;
+      o.life -= DT;
+      if (o.k === 'verde') {
+        o.s += o.v * Math.cos(o.yaw) * DT; o.d += o.v * Math.sin(o.yaw) * DT;
+        if (Math.abs(o.d) > wall - .5) { o.d = Math.sign(o.d) * (wall - .5); o.yaw = -o.yaw; if (--o.bounce < 0) dead = true; }
+        if (Math.abs(o.d) < 1 && Math.abs(o.yaw) < .05) o.yaw += .001;
+      } else if (o.k === 'rosso') {
+        var tg = S.karts[o.target]; o.s += o.v * DT;
+        if (tg && !tg.finished) { var gap = ((tg.s - o.s) % L + L) % L; if (gap < 40) o.d += G.clamp(tg.d - o.d, -16 * DT, 16 * DT); }
+        else o.d += G.clamp(Ts.at(T, o.s).line * (half - 2) - o.d, -6 * DT, 6 * DT);
       }
-      if (S.phase === 'fine') return;
-
-      var frameStart = S.raceT;
-      S.raceT += dt;
-
-      var here = segAt(S.z);
-      var onRoad = Math.abs(S.x) < 1;
-
-      /* The throttle is automatic — a child who has to hold a pedal AND steer
-         has two jobs, and steering is the one that matters. What the road takes
-         away is speed when you leave it, and that is the whole punishment
-         model: no crash, no spin, no reset, just a slower kart and the pack
-         pulling away. Losing here is a thing you watch happen, not a screen. */
-      /* A boost lifts the ceiling AND the pull towards it, or it reads as a
-         flame with nothing behind it. It does not rescue you from the grass:
-         off the road the ceiling is still the grass ceiling, just raised. */
-      var kick = S.boost > 0 ? BOOST_MUL : 1;
-      var top = (onRoad ? MAX_SPD : OFF_SPD) * kick;
-      if (S.spd < top) S.spd += ACCEL * (S.boost > 0 ? 2.4 : 1) * dt;
-      else S.spd -= BRAKE * dt;
-      S.spd = G.clamp(S.spd, 0, MAX_SPD * BOOST_MUL);
-      S.off = onRoad ? Math.max(0, S.off - dt * 3) : Math.min(1, S.off + dt * 3);
-
-      var distBefore = S.dist;
-      var travel = S.spd * dt;
-      S.z = wrapZ(S.z + travel);
-
-      /* Steering scales with speed: standing still you cannot turn, which is
-         both true and what keeps the kart from pirouetting at the start line. */
-      var grip = Math.min(1, S.spd / MAX_SPD);
-      /* Crossing from the middle of the road to its edge takes about three
-         quarters of a second at full speed. An early version took half of one,
-         which meant a single touch put you on the grass before you saw anything
-         move. */
-      S.x += S.steer * dt * STEER_RATE * grip;
-      /* The outward push of the bend — the thing that makes a corner something
-         you fight rather than something you watch go by. It must stay weaker
-         than full lock, or the bend is not a corner, it is a wall; but it must
-         be strong enough that a long bend carries you off if you ignore it. */
-      S.x -= here.curve * dt * grip * CENTRIF;
-      S.x = G.clamp(S.x, -OFF_MAX, OFF_MAX);
-
-      /* The drawn lean lags the finger. Snapping it makes the kart look like a
-         cardboard cut-out being flicked; a tenth of a second of lag reads as
-         weight. */
-      S.leanShown += (S.steer * grip - S.leanShown) * Math.min(1, dt * 9);
-      S.boost = Math.max(0, S.boost - dt);
-      S.shield = Math.max(0, S.shield - dt);
-      S.bump = Math.max(0, S.bump - dt * 2.6);
-
-      /* LA DERAPATA. Mario Kart's mini-turbo, and the reason it belongs in a
-         game aimed this young: charging it costs nothing a child was not doing
-         anyway. Holding your finger down through a bend IS how a three-year-old
-         steers — so they get the boost by accident, over and over, and it feels
-         like the kart rewarding them. The six-year-old will work out that the
-         long hold pays double, and that is her whole extra game. */
-      if (Math.abs(S.steer) > 0.9 && onRoad && S.spd > MAX_SPD * 0.55) {
-        S.drift += dt;
-      } else if (S.drift > 0) {
-        if (S.drift >= DRIFT_2) { S.boost = Math.max(S.boost, 1.4); G.sfx('win'); G.fx.ring(W / 2, H - 120, C.sun, 190); }
-        else if (S.drift >= DRIFT_1) { S.boost = Math.max(S.boost, 0.8); G.sfx('whoosh'); }
-        S.drift = 0;
+      o.s = ((o.s % L) + L) % L;
+      if (o.life <= 0) dead = true;
+      if (!dead) for (var k = 0; k < S.karts.length; k++) {
+        var kt = S.karts[k]; if (kt.air || kt.fall > 0) continue;
+        if (o.k !== 'banana' && kt.id === o.owner && o.life > (o.k === 'verde' ? 6.6 : 8.6)) continue;   // your own shell needs a moment to leave
+        if (near(S, o, kt, o.k === 'banana' ? 1.5 : 2.0, o.k === 'banana' ? 1.5 : 1.8)) { hit(S, kt, o.k); dead = true; break; }
       }
+      if (!dead && o.k !== 'banana') for (var b = 0; b < S.objs.length; b++) { var ob = S.objs[b]; if (ob !== o && ob.k === 'banana' && near(S, o, ob, 1.5, 1.5)) { S.objs.splice(b, 1); if (b < i) i--; dead = true; break; } }
+      if (dead) S.objs.splice(i, 1);
+    }
+  }
+  function places(S) {
+    var sorted = S.karts.slice().sort(function (a, b) {
+      if (a.finished && b.finished) return a.ftime - b.ftime;
+      if (a.finished !== b.finished) return a.finished ? -1 : 1;
+      return progress(S, b) - progress(S, a);
+    });
+    sorted.forEach(function (k, i) { k.place = i + 1; });
+  }
+  /* when the child crosses the line, everyone still racing gets a fair finish time from their pace */
+  function finishAll(S) {
+    var L = TR().sample(track(S)).L;
+    S.karts.forEach(function (k) {
+      if (k.finished) return;
+      var left = S.laps * L - progress(S, k), pace = Math.max(12, vmax(S, k) * .92);
+      k.ftime = S.t + left / pace; k.estimated = true;
+    });
+    S.results = S.karts.slice().sort(function (a, b) { return a.ftime - b.ftime; }).map(function (k, i) { return { id: k.id, name: k.name, col: k.col, time: k.ftime, place: i + 1, points: POINTS[i], player: !k.ai }; });
+  }
 
-      takeBoxes(dt);
-      updateObstacles(dt);
-      updateBullets(dt);
-      S.armaFlash = Math.max(0, S.armaFlash - dt);
-      S.flash = Math.max(0, S.flash - dt);
-      updateRivals(dt, frameStart);
-      resolveRivalContacts(dt);
-      S.dist += travel;
-      S.lapT += dt;
+  /* the AI: follow the racing line, dodge bananas, use items with some sense */
+  function aiControl(S, k) {
+    var T = track(S), Ts = TR(), half = T.width / 2, look = 10 + k.v * .6, p = Ts.at(T, k.s), p2 = Ts.at(T, k.s + look);
+    var want = G.clamp(p2.line * (half - 2.2) + k.aiOff, -half + 1.6, half - 1.6);
+    S.objs.forEach(function (o) { if (o.k === 'banana') { var gap = o.s - k.s; if (gap > 0 && gap < 28 && Math.abs(o.d - want) < 2.2) want += o.d > want ? -3 : 3; } });
+    // pure pursuit in world space: aim at the real point ahead on the racing line
+    var me = Ts.world(T, k.s, k.d), aim = Ts.world(T, k.s + look, want), H = p.th + k.yaw;
+    var steer = G.clamp(wrapA(Math.atan2(aim[2] - me[2], aim[0] - me[0]) - H) * 3.2, -1, 1), use = false;
+    if (k.item) {
+      k.aiHold += DT;
+      var ahead = S.karts.filter(function (o) { return o !== k && o.place === k.place - 1; })[0], behind = S.karts.filter(function (o) { return o !== k && o.place === k.place + 1; })[0];
+      var gapA = ahead ? progress(S, ahead) - progress(S, k) : 1e9, gapB = behind ? progress(S, k) - progress(S, behind) : 1e9;
+      if (k.item === 'banana') use = gapB < 14 || k.aiHold > 5;
+      else if (k.item === 'verde') use = (gapA < 30 && Math.abs(ahead.d - k.d) < 2.5) || k.aiHold > 7;
+      else if (k.item === 'rosso') use = gapA < 70 || k.aiHold > 6;
+      else if (k.item === 'turbo') use = Math.abs(p.cv) < .006 || k.aiHold > 4;
+      else use = true;
+      if (k.finished) use = false;
+      if (use) k.aiHold = 0;
+    }
+    return { steer: steer, use: use, bot: true };
+  }
 
-      var finishDist = S.laps * trackLen;
-      if (S.dist >= finishDist) {
-        var cross = travel > 0 ? (finishDist - distBefore) / travel : 0;
-        S.z = wrapZ(S.z - (S.dist - finishDist));
-        S.dist = finishDist;
-        S.finishAt = frameStart + dt * G.clamp(cross, 0, 1);
+  G.race = { create: create, step: step, aiControl: aiControl, progress: progress, ITEMS: ITEMS, POINTS: POINTS, RIVALS: RIVALS, DT: DT, snap: function (S) { return JSON.stringify(S); } };
+})();
+
+
+/* ==================== 40-gara.js ==================== */
+/* Dino Kart — the race on screen: 3D world, camera, sparks, HUD, controls.
+   Touch: hold the left half to steer left, the right half to steer right.
+   Hold all the way into a bend and the kart drifts — blue, orange, purple
+   sparks — let go for the mini-turbo. The round button in the middle uses the
+   item. In the air, a tap is a trick (a little boost on landing).
+   Keyboard: arrows or A/D to steer, space to use, up for tricks. */
+(function () {
+  'use strict';
+  var C = G.C, W = G.W, H = G.H, DT = 1 / 60, GL = G.GL, M4 = GL.M4;
+  var S = null, acc = 0, touches = {}, keys = {}, steerV = 0, mesh = {}, camH = 0, camP = null, parts = [], banner = null, quiet = false, gp = null, eng = null, shown = { lap: 0 };
+  var ITEM_BTN = { x: 640, y: 628, r: 72 };
+
+  function T() { return G.tracks.TRACKS[S.ti]; }
+  function theme() { return G.tracks.THEMES[T().theme]; }
+  function sfx(n) { if (!quiet) G.sfx(n); }
+  function say(s) { if (!quiet) G.say(s); }
+
+  function start(o) {
+    gp = o.gp || null; quiet = !!o.quiet;
+    var acct = G.account || { name: 'Dino', color: C.dino };
+    S = G.race.create({ ti: o.ti, level: G.level, player: { name: acct.name, color: acct.color }, seed: o.seed || ((Date.now() & 0xffff) | 1) });
+    if (!mesh[o.ti]) mesh[o.ti] = G.tracks.build(G.tracks.TRACKS[o.ti]);
+    var P = S.karts[S.player], p = G.tracks.at(T(), P.s);
+    camH = p.th; camP = null; parts = []; banner = null; steerV = 0; touches = {}; keys = {}; acc = 0; shown.lap = 0;
+    if (!quiet) setTimeout(function () { if (G.current === 'gara') say(T().name + '! Pronti...'); }, 200);
+  }
+
+  /* ---------------------------------------------------------------- input */
+  function input() {
+    if (S.auto) { var ai = G.race.aiControl(S, S.karts[S.player]); ai.bot = false; return ai; }   // for the look test
+    var l = !!keys.l, r = !!keys.r, use = false, trick = !!keys.up;
+    for (var id in touches) { if (touches[id] === 'l') l = true; if (touches[id] === 'r') r = true; }
+    var target = (r ? 1 : 0) - (l ? 1 : 0);
+    steerV += G.clamp(target - steerV, -6 * DT, 6 * DT);
+    if (S.useTap) { use = true; S.useTap = false; }
+    if (S.trickTap) { trick = true; S.trickTap = false; }
+    return { steer: steerV, use: use, trick: trick, drift: !!keys.drift };
+  }
+
+  /* ---------------------------------------------------------------- update */
+  function update(dt) {
+    acc += dt; var n = 0;
+    while (acc >= DT && n < 4) {
+      if (S.phase !== 'pause') { G.race.step(S, input()); events(); }
+      acc -= DT; n++;
+    }
+    if (n === 4) acc = 0;
+    parts = parts.filter(function (p) { p.t -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.g || 0) * dt; return p.t > 0; });
+    if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
+    engine();
+  }
+  function events() {
+    var P = S.karts[S.player];
+    S.events.forEach(function (e) {
+      var mine = e.id === P.id;
+      if (e.k === 'go') { sfx('win'); banner = { s: 'VIA!', t: 1, col: C.leaf }; }
+      if (!mine) return;
+      if (e.k === 'box') sfx('pop');
+      if (e.k === 'fruit') sfx('coin');
+      if (e.k === 'turbo') { sfx('whoosh'); banner = { s: ['', 'TURBO!', 'SUPER TURBO!', 'ULTRA TURBO!'][e.lvl], t: .9, col: ['', '#4d80e4', C.tangerine, C.plum][e.lvl] }; }
+      if (e.k === 'pad' || e.k === 'trick') sfx('whoosh');
+      if (e.k === 'hit') { sfx('bad'); if (!quiet) G.shake(6); banner = { s: 'Ahi!', t: .9, col: C.berry }; }
+      if (e.k === 'bump') { if (!quiet && Math.random() < .3) sfx('tap'); }
+      if (e.k === 'fall') { sfx('bad'); banner = { s: 'Oplà! Ti riporto su', t: 1.4, col: C.plum }; }
+      if (e.k === 'use') sfx('whoosh');
+      if (e.k === 'lap') { sfx('chime'); if (e.lap === S.laps) { banner = { s: 'ULTIMO GIRO!', t: 1.8, col: C.berry }; say('Ultimo giro!'); } else banner = { s: 'Giro ' + e.lap, t: 1.2, col: C.sun }; }
+      if (e.k === 'finish') { sfx('win'); if (!quiet) G.fx.confetti(); say(P.place === 1 ? 'Primo posto! Sei il campione!' : P.place <= 3 ? 'Sul podio! Bravissimo!' : 'Arrivato! ' + P.place + ' posto'); }
+    });
+  }
+  /* a soft engine hum that follows the speed */
+  function engine() {
+    if (quiet || (G.save && G.save.mute) || !window.AudioContext || S.phase === 'pause' || document.hidden) { if (eng) { try { eng.g.gain.value = 0; } catch (e) {} } return; }
+    try {
+      if (!eng) {
+        var ac = G.audioCtx || (G.audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+        var o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter();
+        o.type = 'sawtooth'; f.type = 'lowpass'; f.frequency.value = 500; g.gain.value = 0;
+        o.connect(f); f.connect(g); g.connect(ac.destination); o.start(); eng = { o: o, g: g, ac: ac };
       }
+      var P = S.karts[S.player];
+      eng.o.frequency.value = 55 + P.v * 5 + (P.boost > 0 ? 40 : 0);
+      eng.g.gain.value = S.phase === 'done' ? 0 : .025;
+    } catch (e) { eng = null; }
+  }
+  function stopEngine() { if (eng) { try { eng.o.stop(); } catch (e) {} eng = null; } }
 
-      /* A lap is a distance, not a line you have to be told you crossed. */
-      var lapNow = Math.floor(S.dist / trackLen) + 1;
-      if (lapNow > S.lap) {
-        /* Clamped, or the last crossing reads "GIRO 3/2" for the frame between
-           the line and the finish. The lap still closes: the time is banked. */
-        S.lap = Math.min(lapNow, S.laps);
-        closeLap();
+  /* ---------------------------------------------------------------- 3D */
+  function wrapA(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+  function kartPose(k) {
+    var Tk = T(), p = G.tracks.at(Tk, k.s), pos = G.tracks.world(Tk, k.s, k.d, k.y), H = p.th + k.yaw;
+    return { pos: pos, H: H, p: p };
+  }
+  function draw3D(c) {
+    var th = theme(), P = S.karts[S.player], pose = kartPose(P), Tk = T();
+    // the camera: behind the kart, looking where the road goes; it swings softly
+    var lookH = P.spin > 0 || P.fall > 0 ? pose.p.th : pose.H;
+    camH += wrapA(lookH - camH) * Math.min(1, G.dt * 5);
+    var fin = S.phase === 'done', orbit = fin ? S.doneT * .5 : 0, back = fin ? 9 : 5.4, ch = camH + orbit;
+    var dir = [Math.cos(ch), 0, Math.sin(ch)], tgt = pose.pos;
+    if (P.fall > 0) tgt = [tgt[0], tgt[1] - (1.4 - P.fall) * 6, tgt[2]];
+    var eye = [tgt[0] - dir[0] * back, tgt[1] + 2.7 + (fin ? 1.5 : 0), tgt[2] - dir[2] * back];
+    if (!camP) camP = eye.slice();
+    for (var q = 0; q < 3; q++) camP[q] += (eye[q] - camP[q]) * Math.min(1, G.dt * 9);
+    var at = [tgt[0] + dir[0] * 7, tgt[1] + 1.4, tgt[2] + dir[2] * 7];
+    var w = Math.max(320, Math.min(1280, Math.round(W * G.view.s * G.view.dpr))), h = Math.round(w * 9 / 16);
+    var boostFov = P.boost > 0 ? .12 : 0;
+    if (!GL.frame({ w: w, h: h, eye: camP, at: at, fov: 1.05 + boostFov, sky: th.fog, fog: th.space ? [140, 420] : [80, 300], far: 600 })) return false;
+    GL.draw(mesh[S.ti]);
+    var t = G.t, F = G.tracks.features(Tk), models = G.models;
+    // boost pads
+    F.pads.forEach(function (pd) { var p = G.tracks.at(Tk, pd.s), wpos = G.tracks.world(Tk, pd.s, pd.d, .02); GL.draw(models.pad(), M4.mul(M4.trans(wpos[0], wpos[1], wpos[2]), M4.rotY(Math.PI / 2 - p.th))); });
+    // item boxes and fruit
+    S.boxes.forEach(function (b) {
+      if (b.t > 0) return; var wpos = G.tracks.world(Tk, b.s, b.d, 1.3 + Math.sin(t * 3 + b.d) * .15);
+      GL.draw(models.itemBox(), M4.mul(M4.trans(wpos[0], wpos[1], wpos[2]), M4.mul(M4.rotY(t * 1.5 + b.d), M4.rotX(.5))));
+    });
+    S.fruits.forEach(function (f) {
+      if (f.t > 0) return; var wpos = G.tracks.world(Tk, f.s, f.d, 1.1 + Math.sin(t * 4 + f.s) * .12);
+      GL.draw(models.fruit(), M4.mul(M4.trans(wpos[0], wpos[1], wpos[2]), M4.rotY(t * 2 + f.s)));
+    });
+    // bananas and shells
+    S.objs.forEach(function (o) {
+      var wpos = G.tracks.world(Tk, o.s, o.d, o.k === 'banana' ? 0 : .1), m = o.k === 'banana' ? models.banana() : models.shell(o.k === 'rosso');
+      GL.draw(m, M4.mul(M4.trans(wpos[0], wpos[1], wpos[2]), M4.rotY(o.k === 'banana' ? o.s : t * 8)));
+    });
+    // karts, with a blob shadow each
+    S.karts.forEach(function (k) {
+      if (k.fall > 0 && k.fall < 1.1) return;
+      var ps = kartPose(k), yaw = Math.PI / 2 - ps.H + (k.spin > 0 ? k.spinA : 0) + (k.drift ? -k.drift * .35 : 0);
+      var road = G.tracks.world(Tk, k.s, k.d, .04);
+      GL.draw(models.blob(), M4.mul(M4.trans(road[0], road[1], road[2]), M4.rotY(Math.PI / 2 - ps.H)), { alpha: .28 });
+      var bob = Math.sin(t * 30 + k.id) * .03 * (k.v / 26), tilt = -k.steer * .06 * (k.v / 26) + (k.drift ? k.drift * .08 : 0);
+      var m = M4.mul(M4.trans(ps.pos[0], ps.pos[1] + bob, ps.pos[2]), M4.mul(M4.rotY(yaw), M4.rotZ(tilt)));
+      if (k.air) m = M4.mul(m, M4.rotX(-.15));
+      // a kart right on top of the camera would hide your own: let it be see-through
+      var camD = Math.hypot(ps.pos[0] - camP[0], ps.pos[2] - camP[2]), see = k !== P && camD < 5.5 ? .35 : 1;
+      GL.draw(models.kart(k.col), m, see < 1 ? { alpha: see } : k.star > 0 ? { tint: [1.2 + Math.sin(t * 20) * .3, 1.1, .6 + Math.sin(t * 15) * .4] } : null);
+    });
+    c.drawImage(GL.R.canvas, 0, 0, W, H);
+    return true;
+  }
+  function backdrop(c) {
+    var th = theme(), g = c.createLinearGradient(0, 0, 0, H * .62);
+    g.addColorStop(0, th.sky[0]); g.addColorStop(1, th.sky[1]); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    var off = ((-camH / (Math.PI * 2)) * 2400 % 2400 + 2400) % 2400, i, x;
+    if (th.space) {
+      c.fillStyle = '#ffffff';
+      for (i = 0; i < 120; i++) { x = ((i * 233 + off * .5) % 1400) - 60; var y = (i * 97) % 420, r = (i % 3) + 1; c.globalAlpha = .4 + (i % 5) / 8; c.fillRect(x, y, r, r); }
+      c.globalAlpha = 1; return;
+    }
+    c.fillStyle = 'rgba(255,250,215,.9)'; c.beginPath(); c.arc(((1000 + off * .3) % 1600) - 160, 110, 46, 0, 7); c.fill();
+    c.fillStyle = th.hills || '#9cc7b5';
+    for (i = -1; i < 7; i++) { x = i * 400 - (off % 400); c.beginPath(); c.moveTo(x - 260, 420); c.quadraticCurveTo(x, 180 + (i % 3) * 40, x + 260, 420); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.75)';
+    for (i = 0; i < 6; i++) { x = ((i * 330 + off * .6) % 1700) - 200; c.beginPath(); c.arc(x, 90 + (i % 3) * 36, 30, 0, 7); c.arc(x + 34, 82 + (i % 3) * 36, 26, 0, 7); c.arc(x + 62, 94 + (i % 3) * 36, 22, 0, 7); c.fill(); }
+  }
+  /* sparks, flames, dust: 2D, glued to projected 3D points */
+  function effects(c) {
+    var P = S.karts[S.player], Tk = T();
+    S.karts.forEach(function (k) {
+      if (k.fall > 0) return;
+      var ps = kartPose(k), sx = Math.cos(ps.H), sz = Math.sin(ps.H), rx = -sz, rz = sx;
+      var rear = [ps.pos[0] - sx * 1.6, ps.pos[1] + .3, ps.pos[2] - sz * 1.6];
+      var pr = GL.project(rear, W, H); if (!pr || pr.s < .004) return;
+      var sc = Math.min(3, pr.s * 70);
+      if (k.drift && k.charge > .2) {
+        var lvl = k.charge > 2.2 ? 3 : k.charge > 1.4 ? 2 : k.charge > .7 ? 1 : 0, col = ['#ffffff', '#5ab0ff', '#ffb04a', '#c58cff'][lvl];
+        [-1, 1].forEach(function (sd) {
+          var wp = GL.project([rear[0] + rx * sd, rear[1] - .2, rear[2] + rz * sd], W, H); if (!wp) return;
+          for (var i = 0; i < 3; i++) { c.fillStyle = col; c.beginPath(); c.arc(wp.x + (Math.random() - .5) * 14 * sc, wp.y - Math.random() * 10 * sc, (2 + Math.random() * 3) * sc, 0, 7); c.fill(); }
+        });
       }
+      if (k.boost > 0) {
+        for (var i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#ffd75e' : '#ff7a1a'; c.beginPath(); c.arc(pr.x + (Math.random() - .5) * 18 * sc, pr.y + (Math.random() - .5) * 8 * sc, (6 + Math.random() * 8) * sc, 0, 7); c.fill(); }
+      }
+      if (k === P && Math.abs(P.d) > Tk.width / 2 + .8 && P.v > 6 && !theme().space && Math.random() < .5)
+        parts.push({ x: pr.x + (Math.random() - .5) * 60, y: pr.y, vx: (Math.random() - .5) * 60, vy: -40 - Math.random() * 40, t: .5, col: 'rgba(160,130,90,.6)', r: 8 });
+    });
+    parts.forEach(function (p) { c.globalAlpha = Math.max(0, p.t * 2); c.fillStyle = p.col; c.beginPath(); c.arc(p.x, p.y, p.r, 0, 7); c.fill(); });
+    c.globalAlpha = 1;
+    // speed lines when boosting
+    if (P.boost > 0) { c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 4; for (var j = 0; j < 14; j++) { var a = (j * 2.4 + G.t * 7) % 6.28, r0 = 360 + (j * 37 % 160); c.beginPath(); c.moveTo(640 + Math.cos(a) * r0, 360 + Math.sin(a) * r0 * .6); c.lineTo(640 + Math.cos(a) * (r0 + 160), 360 + Math.sin(a) * (r0 + 160) * .6); c.stroke(); } }
+  }
 
-      /* Position: who has covered more ground. No fudging, no hidden ordering —
-         if a rival is ahead of you it is because it drove further. */
-      var ahead = 0, i;
-      for (i = 0; i < rivals.length; i++) if (rivals[i].dist > S.dist) ahead++;
-      S.place = ahead + 1;
+  /* ---------------------------------------------------------------- HUD */
+  function itemIcon(c, it, x, y, r) {
+    c.save();
+    if (it === 'banana') { c.strokeStyle = '#ffd75e'; c.lineWidth = r * .4; c.lineCap = 'round'; c.beginPath(); c.arc(x, y - r * .3, r * .6, .3, Math.PI - .3); c.stroke(); }
+    else if (it === 'verde' || it === 'rosso') { c.fillStyle = it === 'verde' ? '#2f9e57' : '#e8362b'; c.beginPath(); c.arc(x, y, r * .62, Math.PI, 0); c.fill(); c.fillStyle = '#fff6e0'; c.fillRect(x - r * .7, y, r * 1.4, r * .2); c.fillStyle = 'rgba(255,255,255,.5)'; c.beginPath(); c.arc(x - r * .2, y - r * .3, r * .15, 0, 7); c.fill(); }
+    else if (it === 'turbo') { c.fillStyle = '#e8362b'; c.beginPath(); c.ellipse(x, y + r * .1, r * .3, r * .62, .5, 0, 7); c.fill(); c.fillStyle = C.leaf; c.fillRect(x + r * .1, y - r * .7, r * .2, r * .3); }
+    else if (it === 'stella') A.star(c, x, y, r * .7, C.sun);
+    else if (it === 'frutti') { A.fruit(c, x - r * .3, y + r * .1, r * .35, 'fragola'); A.fruit(c, x + r * .3, y + r * .1, r * .35, 'mela'); A.fruit(c, x, y - r * .3, r * .35, 'banana'); }
+    c.restore();
+  }
+  function minimap(c, x0, y0, sz) {
+    var Ss = G.tracks.sample(T()), mx = Math.min.apply(null, Ss.x), Mx = Math.max.apply(null, Ss.x), mz = Math.min.apply(null, Ss.z), Mz = Math.max.apply(null, Ss.z);
+    var k = sz / Math.max(Mx - mx, Mz - mz), ox = x0 + (sz - (Mx - mx) * k) / 2, oz = y0 + (sz - (Mz - mz) * k) / 2;
+    c.fillStyle = 'rgba(23,40,55,.5)'; G.roundRect(c, x0 - 12, y0 - 12, sz + 24, sz + 24, 18); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 6; c.lineJoin = 'round'; c.beginPath();
+    for (var i = 0; i <= Ss.N; i += 4) { var j = i % Ss.N; if (i) c.lineTo(ox + (Ss.x[j] - mx) * k, oz + (Ss.z[j] - mz) * k); else c.moveTo(ox + (Ss.x[j] - mx) * k, oz + (Ss.z[j] - mz) * k); }
+    c.closePath(); c.stroke();
+    S.karts.slice().reverse().forEach(function (kt) { var p = G.tracks.at(T(), kt.s); c.fillStyle = kt.col; c.beginPath(); c.arc(ox + (p.x - mx) * k, oz + (p.z - mz) * k, kt.ai ? 6 : 9, 0, 7); c.fill(); if (!kt.ai) { c.strokeStyle = '#fff'; c.lineWidth = 3; c.stroke(); } });
+  }
+  function fmt(t) { var m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+  function hud(c) {
+    var P = S.karts[S.player], placeCol = ['#ffd75e', '#e9edf0', '#e0a066'][P.place - 1] || '#ffffff';
+    G.text(P.place + '°', 92, 70, { size: 92, color: placeCol, stroke: '#1b2b3a', strokeWidth: 12 });
+    G.text('/' + S.karts.length, 162, 92, { size: 28, color: '#fff', stroke: '#1b2b3a', strokeWidth: 6 });
+    A.fruit(c, 50, 152, 20, 'fragola'); G.text('×' + P.coins, 74, 153, { size: 30, color: '#fff', align: 'left', stroke: '#1b2b3a', strokeWidth: 6 });
+    minimap(c, 24, 200, 150);
+    c.fillStyle = 'rgba(23,40,55,.55)'; G.roundRect(c, 470, 10, 340, 74, 22); c.fill();
+    G.text('GIRO ' + Math.max(1, Math.min(S.laps, P.lap + 1)) + '/' + S.laps, 560, 47, { size: 30, color: '#fff' });
+    G.text(fmt(S.t), 718, 47, { size: 28, color: C.sun });
+    // the item slot
+    c.fillStyle = 'rgba(23,40,55,.6)'; G.roundRect(c, 1124, 14, 136, 136, 28); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 5; G.roundRect(c, 1132, 22, 120, 120, 22); c.stroke();
+    if (P.roul > 0) itemIcon(c, G.race.ITEMS[Math.floor(G.t * 14) % G.race.ITEMS.length], 1192, 82, 50);
+    else if (P.item) itemIcon(c, P.item, 1192, 82, 50);
+    if (P.item && P.roul <= 0 && S.phase === 'race') {
+      var pulse = 1 + Math.sin(G.t * 8) * .05, b = ITEM_BTN;
+      c.fillStyle = 'rgba(255,246,224,.9)'; c.beginPath(); c.arc(b.x, b.y, b.r * pulse, 0, 7); c.fill(); c.strokeStyle = C.berry; c.lineWidth = 8; c.stroke();
+      itemIcon(c, P.item, b.x, b.y + 4, 46);
+    }
+    // countdown
+    if (S.phase === 'count') {
+      var n = Math.ceil(S.count - .4);
+      c.fillStyle = 'rgba(23,40,55,.7)'; G.roundRect(c, 470, 120, 340, 110, 30); c.fill();
+      for (var i = 0; i < 3; i++) { c.fillStyle = 3 - i > n ? (n <= 0 ? C.leaf : '#e8362b') : '#3b4b5a'; c.beginPath(); c.arc(550 + i * 90, 175, 36, 0, 7); c.fill(); }
+      if (n > 0 && n <= 3) G.text(String(n), 640, 330, { size: 130, color: '#fff', stroke: '#1b2b3a', strokeWidth: 14 });
+    }
+    if (banner) G.text(banner.s, 640, 300 - (1 - Math.min(1, banner.t)) * 30, { size: 70, color: banner.col, stroke: '#1b2b3a', strokeWidth: 12 });
+    if (S.phase === 'race' && S.t < 6) {
+      c.globalAlpha = Math.max(0, 1 - S.t / 6) * .8;
+      [[-1, 110], [1, 1170]].forEach(function (d) { c.fillStyle = 'rgba(255,255,255,.5)'; c.beginPath(); c.arc(d[1], 520, 64, 0, 7); c.fill(); c.fillStyle = '#1b2b3a'; c.beginPath(); c.moveTo(d[1] + d[0] * 30, 520); c.lineTo(d[1] - d[0] * 20, 486); c.lineTo(d[1] - d[0] * 20, 554); c.fill(); });
+      c.globalAlpha = 1;
+    }
+    G.ui.button({ id: 'g-pause', x: 900, y: 14, w: 200, h: 80, r: 22, color: 'rgba(23,40,55,.6)', label: 'Ⅱ', fontSize: 38, onTap: function () { if (S.phase === 'race' || S.phase === 'count') { S.prev = S.phase; S.phase = 'pause'; } } });
+  }
+  function results(c) {
+    c.fillStyle = 'rgba(15,25,40,.72)'; c.fillRect(0, 0, W, H);
+    c.fillStyle = C.cream; G.roundRect(c, 270, 40, 740, 640, 34); c.fill();
+    var P = S.karts[S.player], me = S.results.filter(function (r) { return r.player; })[0];
+    G.text(me.place === 1 ? 'Hai vinto!' : me.place <= 3 ? 'Sul podio!' : me.place + '° posto', 640, 100, { size: 54, color: C.leafDeep });
+    S.results.forEach(function (r, i) {
+      var y = 160 + i * 52;
+      c.fillStyle = r.player ? '#ffe9a8' : (i % 2 ? '#f3ead6' : '#fbf4e4'); G.roundRect(c, 310, y - 22, 660, 46, 14); c.fill();
+      G.text(r.place + '°', 350, y, { size: 28, color: C.ink });
+      c.fillStyle = r.col; c.beginPath(); c.arc(400, y, 15, 0, 7); c.fill();
+      G.text(r.name, 430, y, { size: 26, color: C.ink, align: 'left', maxWidth: 260 });
+      G.text(fmt(r.time), 800, y, { size: 24, color: '#5a6a7a' });
+      if (gp) G.text('+' + r.points, 920, y, { size: 26, color: C.leaf });
+    });
+    var bx = gp ? [[350, 'Classifica', C.leaf, function () { G.go('classifica'); }]] : [[290, 'Riprova', C.water, function () { start({ ti: S.ti }); }], [530, 'Altra pista', C.leaf, function () { G.go('piste'); }], [770, 'Menu', C.tangerine, function () { G.go('menu'); }]];
+    bx.forEach(function (b) { G.ui.button({ id: 'r-' + b[1], x: gp ? 440 : b[0], y: 592, w: gp ? 400 : 220, h: 76, r: 24, color: b[2], label: b[1], fontSize: 30, onTap: b[3] }); });
+  }
+  function pauseMenu(c) {
+    c.fillStyle = 'rgba(15,25,40,.7)'; c.fillRect(0, 0, W, H);
+    c.fillStyle = C.cream; G.roundRect(c, 340, 180, 600, 360, 34); c.fill();
+    G.text('Pausa', 640, 250, { size: 56, color: C.leafDeep });
+    G.ui.button({ id: 'p-go', x: 380, y: 360, w: 250, h: 100, color: C.leaf, label: 'Continua', onTap: function () { S.phase = S.prev || 'race'; } });
+    G.ui.button({ id: 'p-out', x: 650, y: 360, w: 250, h: 100, color: C.tangerine, label: 'Esci', onTap: function () { G.go('menu'); } });
+  }
+  function draw(c) {
+    backdrop(c);
+    if (!draw3D(c)) { G.text('Il 3D non è disponibile su questo dispositivo', 640, 360, { size: 30, color: '#fff' }); return; }
+    effects(c); hud(c);
+    if (S.phase === 'done' && S.doneT > 2.2 && S.results) {
+      if (!S.counted) { S.counted = true; if (gp) G.gpRecord(S.results); else G.kartBestSingle(S); }
+      results(c);
+    }
+    if (S.phase === 'pause') pauseMenu(c);
+  }
 
-      if (S.finishAt !== null) finish();
-    },
-
-    /* IL TASTO DI FUOCO NON PUO' RUBARE LO STERZO. Sterzare occupa gia tutte e
-       due le meta dello schermo, quindi un'arma avrebbe bisogno di un posto suo
-       — ma un bambino che tiene il tablet appoggia i pollici in basso, ed e' li
-       che va messo. Quindi la fascia in fondo diventa il tasto di fuoco SOLO
-       quando hai qualcosa in mano: a mani vuote sterza come tutto il resto, e
-       non esiste nessuna zona morta da imparare. */
+  function ctrlAt(p) {
+    if (S.karts[S.player].item && Math.hypot(p.x - ITEM_BTN.x, p.y - ITEM_BTN.y) < ITEM_BTN.r + 12) return 'item';
+    if (p.y < 110) return null;
+    return p.x < 640 ? 'l' : 'r';
+  }
+  G.scene('gara', {
+    hud: false, back: false,
+    enter: function (o) { start(o || { ti: 0 }); },
+    exit: function () { stopEngine(); touches = {}; keys = {}; },
+    update: update, draw: draw,
     onDown: function (p) {
-      if (S.phase !== 'gara') return;
-      // A second thumb can fire without cancelling the thumb already steering.
-      if (S.ammo && p.y >= FIRE_Y) { shoot(); return; }
-      steerPointer = p.id;
-      touchSteer = p.x < W / 2 ? -1 : 1; applySteering();
+      if (S.phase === 'done' || S.phase === 'pause') return;
+      var k = ctrlAt(p); if (!k) return;
+      if (S.karts[S.player].air) S.trickTap = true;
+      if (k === 'item') { S.useTap = true; return; }
+      touches[p.id] = k;
     },
-    onMove: function (p) {
-      if (S.phase !== 'gara') return;
-      if (p.id !== steerPointer) return;
-      touchSteer = p.x < W / 2 ? -1 : 1; applySteering();
-    },
-    onUp: function (p) {
-      if (p.id !== steerPointer) return;
-      steerPointer = null;
-      touchSteer = 0; applySteering();
-    },
+    onMove: function (p) { if (touches[p.id]) { var k = ctrlAt(p); if (k === 'l' || k === 'r') touches[p.id] = k; } },
+    onUp: function (p) { delete touches[p.id]; },
+    onCancel: function () { touches = {}; }
+  });
+  var KEY = { ArrowLeft: 'l', a: 'l', A: 'l', ArrowRight: 'r', d: 'r', D: 'r', ArrowUp: 'up', w: 'up', W: 'up', Shift: 'drift' };
+  window.addEventListener('keydown', function (e) {
+    if (G.current !== 'gara' || !S) return;
+    if (e.key === ' ') { e.preventDefault(); S.useTap = true; return; }
+    if (e.key === 'Escape') { if (S.phase === 'race') { S.prev = 'race'; S.phase = 'pause'; } else if (S.phase === 'pause') S.phase = S.prev; return; }
+    var k = KEY[e.key]; if (k) { e.preventDefault(); keys[k] = true; if (k === 'up' && S.karts[S.player].air) S.trickTap = true; }
+  });
+  window.addEventListener('keyup', function (e) { var k = KEY[e.key]; if (k) keys[k] = false; });
+  window.addEventListener('blur', function () { keys = {}; touches = {}; });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && S && G.current === 'gara' && S.phase === 'race') { S.prev = 'race'; S.phase = 'pause'; } });
 
-    exit: clearSteering,
-    draw: function (c) { drawAll(c); }
+  G.gara = { state: function () { return S; }, start: start, mesh: mesh, quiet: function (q) { quiet = q; } };
+})();
+
+
+/* ==================== 50-menu.js ==================== */
+/* Dino Kart — menus, the Grand Prix and the podium.
+   Gran Premio: four races of a cup, points after every race (15, 12, 10, 8,
+   6, 4, 2, 1), and a 3D podium at the end with the trophy. A trophy in the
+   Coppa Frutta opens the Coppa Stella. Gara singola: any open track. */
+(function () {
+  'use strict';
+  var C = G.C, W = G.W, H = G.H, GL = G.GL, M4 = GL.M4;
+  var GP = null;   // { cup, idx, pts: {name: points}, cols: {name: col}, last: results }
+
+  function save() { var s = G.save.kart3 || (G.save.kart3 = {}); s.cups = s.cups || {}; s.best = s.best || {}; return s; }
+  function trophyOf(cup) { var c = save().cups[cup] || {}; return c[G.level] || 0; }   // 1 gold, 2 silver, 3 bronze
+  function cupOpen(cup) { return cup === 0 || [1, 2].some(function (lv) { var c = save().cups[cup - 1] || {}; return c[lv] > 0 && c[lv] <= 3; }); }
+  G.kartSave = save;
+
+  /* ---------------------------------------------------------------- turntable */
+  function turntable(c, col, x, y, w, h, extra) {
+    if (!GL.frame({ w: w, h: h, eye: [Math.cos(G.t * .6) * 6.5, 3.4, Math.sin(G.t * .6) * 6.5], at: [0, 1, 0], fov: .8, sky: '#000000', fog: [400, 800] })) return;
+    GL.draw(G.models.kart(col), M4.trans(0, 0, 0));
+    if (extra) extra();
+    c.drawImage(GL.R.canvas, x, y, w, h);
+  }
+  function bg(c, a, b) { var g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, a || '#2b5876'); g.addColorStop(1, b || '#4e9fb8'); c.fillStyle = g; c.fillRect(0, 0, W, H); }
+  function trophyIcon(c, place, x, y, s) {
+    var col = ['', '#ffd75e', '#d9dee3', '#e0a066'][place] || 'rgba(255,255,255,.25)';
+    c.fillStyle = col; c.beginPath(); c.moveTo(x - 24 * s, y - 30 * s); c.lineTo(x + 24 * s, y - 30 * s); c.quadraticCurveTo(x + 22 * s, y + 6 * s, x, y + 8 * s); c.quadraticCurveTo(x - 22 * s, y + 6 * s, x - 24 * s, y - 30 * s); c.fill();
+    c.fillRect(x - 5 * s, y + 6 * s, 10 * s, 14 * s); c.fillRect(x - 16 * s, y + 20 * s, 32 * s, 8 * s);
+  }
+  function miniTrack(c, T, x, y, sz, col) {
+    var S = G.tracks.sample(T), mx = Math.min.apply(null, S.x), Mx = Math.max.apply(null, S.x), mz = Math.min.apply(null, S.z), Mz = Math.max.apply(null, S.z);
+    var k = sz / Math.max(Mx - mx, Mz - mz), ox = x + (sz - (Mx - mx) * k) / 2, oz = y + (sz - (Mz - mz) * k) / 2;
+    c.strokeStyle = col || '#fff'; c.lineWidth = 7; c.lineJoin = 'round'; c.beginPath();
+    for (var i = 0; i <= S.N; i += 4) { var j = i % S.N; if (i) c.lineTo(ox + (S.x[j] - mx) * k, oz + (S.z[j] - mz) * k); else c.moveTo(ox + (S.x[j] - mx) * k, oz + (S.z[j] - mz) * k); }
+    c.closePath(); c.stroke();
+  }
+  function themeCard(c, T, x, y, w, h) {
+    var th = G.tracks.THEMES[T.theme], g = c.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, th.sky[0]); g.addColorStop(1, th.ground ? th.ground[0] : th.sky[1]); c.fillStyle = g; G.roundRect(c, x, y, w, h, 18); c.fill();
+  }
+
+  G.scene('menu', {
+    hud: false, back: false,
+    draw: function (c) {
+      bg(c);
+      G.text('DINO KART', 640, 70, { size: 84, color: '#ffd75e', stroke: '#1b2b3a', strokeWidth: 14 });
+      var col = (G.account && G.account.color) || C.dino;
+      turntable(c, col, 340, 120, 600, 340);
+      G.text(G.account ? G.account.name : '', 640, 470, { size: 34, color: '#fff', stroke: '#1b2b3a', strokeWidth: 7 });
+      [0, 1].forEach(function (cup) { trophyIcon(c, trophyOf(cup), 1120 + cup * 70, 170, 1); });
+      G.ui.button({ id: 'gp', x: 250, y: 510, w: 380, h: 110, r: 30, color: C.leaf, label: 'GRAN PREMIO', fontSize: 40, onTap: function () { G.go('coppe'); } });
+      G.ui.button({ id: 'single', x: 650, y: 510, w: 380, h: 110, r: 30, color: C.water, label: 'Gara singola', fontSize: 38, onTap: function () { G.go('piste'); } });
+      G.ui.button({ id: 'pilot', x: 24, y: 620, w: 270, h: 84, color: C.plum, label: 'Cambia pilota', fontSize: 28, onTap: function () { G.accounts.logout(); G.go('accesso'); } });
+      G.ui.button({ id: 'parents', x: 986, y: 620, w: 270, h: 84, color: C.bark, label: 'Genitori', fontSize: 28, onTap: function () { G.go('gate'); } });
+    }
   });
 
-  /* ------------------------------------------------------------ lap & end */
-  function closeLap() {
-    var g = G.kartSave ? G.kartSave() : null;
-    var id = TRACKS[S.track].id;
-    S.lapShown = S.lapT;
-    if (g && (!g.best[id] || S.lapT < g.best[id])) {
-      g.best[id] = S.lapT;
-      S.newBest = true;
-      G.saveNow();
-    }
-    S.lapT = 0;
-    G.sfx('chime');
-  }
-
-  function finish() {
-    var g = G.kartSave ? G.kartSave() : null, i;
-    S.phase = 'fine'; S.t = 0;
-    /* Everyone's placing is worked out once and frozen. Crossings are timed
-       inside the frame, so a rival cannot gain an invisible extra frame after
-       the line and turn a displayed first place into a second-place podium. */
-    var all = [{ me: true, name: 'Tu', color: (G.account && G.account.color) || C.dino,
-      dist: S.dist, finishAt: S.finishAt, seq: 0 }];
-    for (i = 0; i < rivals.length; i++) {
-      all.push({ me: false, name: rivals[i].name, color: rivals[i].color,
-        dist: rivals[i].dist, finishAt: rivals[i].finishAt, seq: i + 1 });
-    }
-    all.sort(function (a, b) {
-      var af = a.finishAt !== null, bf = b.finishAt !== null;
-      if (af && bf) return a.finishAt - b.finishAt || a.seq - b.seq;
-      if (af) return -1;
-      if (bf) return 1;
-      return b.dist - a.dist || a.seq - b.seq;
-    });
-    S.order = all;
-    for (i = 0; i < all.length; i++) if (all[i].me) S.place = i + 1;
-
-    if (g) {
-      g.races++;
-      if (S.place === 1) g.wins++;
-      G.saveNow();
-    }
-    G.sfx(S.place === 1 ? 'win' : 'chime');
-    if (S.place === 1) G.fx.confetti();
-    G.say(S.place === 1 ? 'Hai vinto!' : 'Sei arrivato ' + S.place + 'esimo!');
-  }
-
-  function fmtT(t) {
-    if (!t || !isFinite(t)) return '--';
-    var m = Math.floor(t / 60), s = t - m * 60;
-    return (m > 0 ? m + "'" : '') + (s < 10 && m > 0 ? '0' : '') + s.toFixed(2) + '"';
-  }
-
-  /* ----------------------------------------------------------------- draw */
-  function drawAll(c) {
-    var t = TRACKS[S.track];
-    var base = segAt(S.z);
-    var fraction = wrapZ(S.z) / SEG_LEN % 1;
-    var camY = G.lerp(base.y, segAt(S.z + SEG_LEN).y, fraction) + CAM_H;
-    var camZ = S.z;
-
-    drawSky(c, t);
-
-    /* Walk forward accumulating the fake curve. `dx` is how much the road
-       shifts per segment; `cx` the running total. */
-    /* Two passes. First the ribbon back-to-front, remembering where each
-       segment landed; then the roadside objects painted over it in the same
-       order, so a tree can never be swallowed by the tarmac drawn after it. */
-    var base0 = Math.floor(wrapZ(S.z) / SEG_LEN);
-    var cx = 0, dx = -base.curve * fraction, i, s, prev = null, maxy = H, drawn = 0;
-    shots.length = 0;
-    for (i = 0; i < DRAW_N; i++) {
-      s = segs[(base0 + i) % segs.length];
-      var segZ = base0 * SEG_LEN + i * SEG_LEN;
-      /* Both terms are in WORLD units, the same units as ROAD_W. This is the
-         bug that made the whole track look straight: the accumulated curve used
-         to be scaled by 0.00018, which moved the road by a tenth of a pixel at a
-         hundred segments while the physics happily pushed the kart off a bend it
-         could not see. */
-      dx += s.curve;
-      cx += dx;
-
-      var p = project((cx * CURVE_SCALE - S.x) * ROAD_W, s.y, segZ, 0, camY, camZ);
-      var cur = { x: p.x, y: p.y, w: p.w, sc: p.s, idx: (base0 + i) % segs.length };
-
-      if (prev && cur.y < maxy && cur.y < prev.y) {
-        drawSeg(c, prev, cur, s.dark);
-        maxy = cur.y;
-        drawn++;
-      }
-      shots.push(cur);
-      prev = cur;
-      if (cur.y < HORIZON - 40) break;
-    }
-    /* How far off centre the road has swept by the time it reaches the horizon.
-       In a long bend this is SUPPOSED to be large — that sweep is the whole look
-       of the technique — but if it runs to thousands of pixels the road just
-       stops in mid-air at the side of the screen instead of vanishing into it,
-       and there is nothing on screen to drive towards. The smoke test watches
-       it, because nothing else would. */
-    S.farX = shots.length ? shots[shots.length - 1].x : W / 2;
-
-    drawProps(c);
-    drawBoxes(c);
-    drawObstacles(c);
-    drawBullets(c);
-    drawRivals(c);
-    drawKart(c);
-    drawRaceHud(c);
-    if (S.phase === "via") drawLights(c);
-    if (S.phase === "fine") drawResults(c);
-    void drawn;
-  }
-
-  function drawSky(c, t) {
-    var g = c.createLinearGradient(0, 0, 0, HORIZON + 60);
-    g.addColorStop(0, t.sky[0]);
-    g.addColorStop(1, t.sky[1]);
-    c.fillStyle = g;
-    c.fillRect(0, 0, W, HORIZON + 60);
-    c.fillStyle = t.id==='collina'?'#76a779':'#d4bb87';
-    c.beginPath();c.moveTo(0,HORIZON);c.bezierCurveTo(150,165,280,182,450,HORIZON);c.bezierCurveTo(760,155,1010,190,W,HORIZON);c.closePath();c.fill();
-    c.fillStyle='rgba(255,250,228,.65)';for(var cloud=0;cloud<3;cloud++){c.beginPath();c.ellipse(260+cloud*350,180-cloud%2*60,70,18,0,0,7);c.fill();}
-    c.fillStyle = COL.grassDark;
-    c.fillRect(0, HORIZON, W, H - HORIZON);
-  }
-
-  /* One trapezium of road, its two rumble strips and the grass either side. */
-  function drawSeg(c, a, b, dark) {
-    var grass = dark ? COL.grassDark : COL.grassLight;
-    var road = dark ? COL.roadDark : COL.roadLight;
-    var rumble = dark ? COL.rumbleLight : COL.rumbleDark;
-
-    c.fillStyle = grass;
-    c.fillRect(0, b.y, W, a.y - b.y + 1);
-
-    quad(c, a.x, a.y, a.w * 1.16, b.x, b.y, b.w * 1.16, rumble);
-    quad(c, a.x, a.y, a.w, b.x, b.y, b.w, road);
-
-    if (!dark) {                            // centre line, only on light strips
-      quad(c, a.x, a.y, a.w * 0.03, b.x, b.y, b.w * 0.03, COL.laneMark);
-    }
-  }
-
-  /* Where every drawn segment landed this frame, so anything standing beside
-     the road can be placed without projecting it a second time. */
-  var shots = [];
-
-  function drawProps(c) {
-    var i, p, sh, x, h, w;
-    for (i = shots.length - 1; i >= 0; i--) {
-      sh = shots[i];
-      if (i < 3 || sh.w < 2) continue;      // see drawBoxes: nothing nearer than the kart
-      var localProps = propsBySegment[sh.idx] || [];
-      for (var j = 0; j < localProps.length; j++) {
-        p = localProps[j];
-        if (p.seg !== sh.idx) continue;
-        x = sh.x + sh.w * p.x;
-        h = sh.sc * p.h * H / 2;
-        if (h < 3 || x < -200 || x > W + 200) continue;
-        w = h * 0.62;
-        if (p.kind === 'albero') {
-          c.fillStyle = '#5a4326';
-          c.fillRect(x - w * 0.08, sh.y - h * 0.34, w * 0.16, h * 0.34);
-          c.fillStyle = '#2f7a3a';
-          c.beginPath();
-          c.ellipse(x,sh.y-h*.62,w*.48,h*.38,0,0,7);c.fill();
-          c.fillStyle='#4b9957';c.beginPath();c.ellipse(x-w*.14,sh.y-h*.76,w*.26,h*.21,-.2,0,7);c.fill();
-        } else if (p.kind === 'palma') {
-          /* A bare trunk with a crown of fronds. Drawn with the same two
-             primitives as the pine, so the beach costs nothing extra. */
-          c.fillStyle = '#8a6a3a';
-          c.fillRect(x - w * 0.055, sh.y - h * 0.78, w * 0.11, h * 0.78);
-          c.fillStyle = '#2f8f57';
-          for (var f = 0; f < 5; f++) {
-            var ang = -2.6 + f * 0.78;
-            c.beginPath();
-            c.moveTo(x, sh.y - h * 0.80);
-            c.lineTo(x + Math.cos(ang) * w * 0.62, sh.y - h * 0.80 + Math.sin(ang) * h * 0.24);
-            c.lineTo(x + Math.cos(ang) * w * 0.50, sh.y - h * 0.66 + Math.sin(ang) * h * 0.24);
-            c.closePath(); c.fill();
-          }
-          c.fillStyle = '#c98a3a';
-          c.beginPath(); c.arc(x, sh.y - h * 0.76, Math.max(1, w * 0.07), 0, 6.2832); c.fill();
-        } else {
-          c.fillStyle = '#7a4a26';
-          c.fillRect(x - w * 0.05, sh.y - h * 0.5, w * 0.10, h * 0.5);
-          c.fillStyle = C.sun;
-          G.roundRect(c, x - w * 0.42, sh.y - h, w * 0.84, h * 0.52, h * 0.08);
-          c.fill();
-          c.strokeStyle = C.ink; c.lineWidth = Math.max(1, h * 0.03); c.stroke();
-        }
-      }
-    }
-  }
-
-  /* A floating leaf-cube, bobbing above the tarmac. Sized off the segment it
-     stands on, exactly like the trees and the rivals — one projection, reused. */
-  function drawBoxes(c) {
-    var i, j, b, sh, x, y, sz, ph;
-    for (i = shots.length - 1; i >= 0; i--) {
-      sh = shots[i];
-      /* NOTHING IS DRAWN NEARER THAN THE KART. The camera sits CAM_BACK behind
-         it, which is four segments, so segments 0..3 are the strip of road
-         BETWEEN the lens and the player: anything painted there comes out
-         nearer than the kart, and therefore bigger. Two crates the size of the
-         dino used to flank him on every straight. Same mistake the rivals made
-         once, same cure — one distance rule for everything standing on a road. */
-      if (i < 4 || sh.w < 2) continue;
-      for (j = 0; j < boxes.length; j++) {
-        b = boxes[j];
-        if (b.seg !== sh.idx || b.cool > 0) continue;
-        sz = sh.sc * 300 * H / 2;
-        if (sz < 4) continue;
-        ph = G.t * 2.6 + j;
-        x = sh.x + sh.w * b.x;
-        y = sh.y - sz * 0.72 - Math.sin(ph) * sz * 0.16;
-        c.save();
-        c.translate(x, y);
-        c.rotate(Math.sin(ph * 0.5) * 0.28);
-        c.fillStyle = C.leaf;
-        G.roundRect(c, -sz / 2, -sz / 2, sz, sz, sz * 0.22); c.fill();
-        c.strokeStyle = 'rgba(20,32,18,.75)'; c.lineWidth = Math.max(1, sz * 0.07);
-        G.roundRect(c, -sz / 2, -sz / 2, sz, sz, sz * 0.22); c.stroke();
-        c.fillStyle = C.sun;
-        c.beginPath();
-        c.moveTo(0, -sz * 0.26);
-        c.lineTo(sz * 0.24, sz * 0.06);
-        c.lineTo(0, sz * 0.30);
-        c.lineTo(-sz * 0.24, sz * 0.06);
-        c.closePath(); c.fill();
-        c.restore();
-      }
-    }
-  }
-
-  /* Blue puddles read as something to skirt around even before one is touched.
-     They use the same projected slice as crates and rivals, so they never pop
-     in front of the kart or become larger than it. */
-  function drawObstacles(c) {
-    var i, j, o, sh, x, y, rx, ry;
-    for (i = shots.length - 1; i >= 0; i--) {
-      sh = shots[i];
-      if (i < 4 || sh.w < 2) continue;
-      for (j = 0; j < obstacles.length; j++) {
-        o = obstacles[j];
-        if (o.seg !== sh.idx) continue;
-        rx = sh.sc * 220 * H / 2;
-        ry = rx * 0.34;
-        if (rx < 4) continue;
-        x = sh.x + sh.w * o.x;
-        y = sh.y - ry * 0.14;
-        c.save();
-        c.globalAlpha = o.cool > 0 ? 0.35 : 0.92;
-        c.fillStyle = '#4da7d8';
-        c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 6.2832); c.fill();
-        c.strokeStyle = '#d6f5ff'; c.lineWidth = Math.max(1, rx * 0.12); c.stroke();
-        c.restore();
-      }
-    }
-  }
-
-  /* I proiettili in volo, con la stessa identica regola di distanza dei kart:
-     e' l'unico modo perche' un cocco a mezza pista non venga grande come una
-     casa. Disegnati prima degli avversari, cosi' quando il colpo arriva sparisce
-     DIETRO il kart che sta colpendo invece che davanti. */
-  function drawBullets(c) {
-    var i, j, b, sh, di, dd, sz, x, y;
-    for (i = shots.length - 1; i >= 0; i--) {
-      sh = shots[i];
-      if (i < 3) continue;
-      for (j = 0; j < bullets.length; j++) {
-        b = bullets[j];
-        di = Math.round(wrapDelta(S.z, b.z) / SEG_LEN);
-        if (di !== i || di < 1) continue;
-        dd = di * SEG_LEN;
-        sz = (CAM_D / (CAM_BACK + dd)) * 260 * W / 2;
-        if (sz < 4) continue;
-        x = sh.x + sh.w * b.x;
-        y = sh.y - sz * 0.7 - Math.abs(Math.sin(b.wob * 9)) * sz * 0.35;
-        if (A.arma) A.arma(c, x, y, sz, b.kind, b.wob);
-      }
-    }
-  }
-
-  /* Rivals, painted from the back of the draw list forwards so a nearer kart
-     covers a farther one, and so a hill hides whoever is behind it — the same
-     ordering the road itself uses. Their size comes from the segment they stand
-     on, which is why nothing here needs a second projection. */
-  function drawRivals(c) {
-    var i, j, r, di, sh, x, sz;
-    for (i = shots.length - 1; i >= 0; i--) {
-      sh = shots[i];
-      for (j = 0; j < rivals.length; j++) {
-        r = rivals[j];
-        di = Math.floor((wrapZ(S.z) % SEG_LEN + CAM_BACK + wrapDelta(S.z, r.z)) / SEG_LEN);
-        if (di !== i || di < 1) continue;         // behind us, or not this slice
-        /* ONE rule for every kart on screen, mine included. The player is drawn
-           at a fixed 210px because the camera sits a fixed CAM_BACK behind him;
-           a rival dd further up the road is therefore at CAM_BACK + dd, and the
-           same world width gives its size. Before this, the two were sized by
-           different rules that never agreed — a rival ten segments ahead came out
-           462px against my 210, so the thing in the distance was twice the size
-           of the thing in my hands. */
-        var dd = wrapDelta(S.z, r.z);
-        var blend = (wrapZ(S.z) % SEG_LEN + CAM_BACK + dd) / SEG_LEN - di;
-        var nextShot = shots[i + 1] || sh;
-        var roadX = G.lerp(sh.x, nextShot.x, blend);
-        var roadY = G.lerp(sh.y, nextShot.y, blend);
-        var roadW = G.lerp(sh.w, nextShot.w, blend);
-        sz = (CAM_D / (CAM_BACK + dd)) * KART_W * W / 2;
-        if (sz < 5) continue;
-        x = roadX + roadW * r.x;
-        A.kartBack(c, x, roadY, sz, {
-          color: r.color, style: r.style,
-          lean: r.hit > 0 ? Math.sin(G.t * 22 + j) * 0.95 : G.clamp(segAt(r.z).curve * 0.12, -1, 1),
-          bob: r.hit > 0 ? Math.sin(G.t * 30 + j) * 3 : 0,
-          boost: r.boost > 0 ? Math.min(0.85, r.boost) : 0
-        });
-      }
-    }
-  }
-
-  /* Four readouts, and no more: which lap, what place, this lap's time, and how
-     fast. A racing HUD that says more than that is a dashboard, and a six-year
-     old reads none of it. */
-  /* THE MAP, and six dots that are the point of it. Watching your dot crawl up
-     on somebody else's is a whole game on its own, and it is the only place
-     where the five rivals exist all at once: on the road you see whoever is in
-     front of you and nothing else. */
-  var MAP = { x: 34, y: 34, w: 210, h: 210 };
-  function drawMap(c) {
-    var i, p, n = mapPts.length;
-    if (!n) return;
-    var pad = 26;
-    var bx = MAP.x, by = MAP.y, bw = MAP.w, bh = MAP.h;
-    var mx = function (u) { return bx + pad + u * (bw - pad * 2); };
-    var my = function (v) { return by + pad + v * (bh - pad * 2); };
-
-    c.save();
-    c.fillStyle = 'rgba(14,20,34,.60)';
-    G.roundRect(c, bx, by, bw, bh, 24); c.fill();
-    c.strokeStyle = 'rgba(255,246,224,.20)'; c.lineWidth = 2;
-    G.roundRect(c, bx, by, bw, bh, 24); c.stroke();
-
-    // the ribbon: a fat pale line, drawn once round
-    c.beginPath();
-    for (i = 0; i <= n; i += 4) {
-      p = mapPts[i % n];
-      if (i === 0) c.moveTo(mx(p[0]), my(p[1])); else c.lineTo(mx(p[0]), my(p[1]));
-    }
-    c.closePath();
-    c.lineJoin = 'round'; c.lineCap = 'round';
-    c.strokeStyle = 'rgba(255,246,224,.30)'; c.lineWidth = 15; c.stroke();
-    c.strokeStyle = 'rgba(255,246,224,.75)'; c.lineWidth = 5; c.stroke();
-
-    // the start line
-    p = mapAt(0);
-    c.fillStyle = C.sun;
-    c.beginPath(); c.arc(mx(p[0]), my(p[1]), 4, 0, 6.2832); c.fill();
-
-    // the field, then me on top so I am never hidden by somebody else
-    for (i = 0; i < rivals.length; i++) {
-      p = mapAt(rivals[i].dist);
-      c.fillStyle = rivals[i].color;
-      c.beginPath(); c.arc(mx(p[0]), my(p[1]), 7, 0, 6.2832); c.fill();
-      c.strokeStyle = 'rgba(12,20,34,.75)'; c.lineWidth = 2; c.stroke();
-    }
-    p = mapAt(S.dist);
-    c.fillStyle = (G.account && G.account.color) || C.dino;
-    c.beginPath(); c.arc(mx(p[0]), my(p[1]), 10, 0, 6.2832); c.fill();
-    c.strokeStyle = '#fff6e0'; c.lineWidth = 3.5; c.stroke();
-    c.restore();
-  }
-
-  /* IL TASTO DI FUOCO ESISTE SOLO QUANDO SERVE. Compare in fondo allo schermo
-     nel momento in cui prendi qualcosa, largo quanto tutto lo schermo, con
-     dentro la cosa che stai per tirare, e sparisce appena l'hai tirata. Non c'e
-     niente da imparare a memoria: c'e un tasto, o non c'e. */
-  function drawFireBar(c) {
-    if (!S.ammo) return;
-    var a = ARMI[S.ammo];
-    var pulse = 0.72 + 0.28 * Math.sin(G.t * 6);
-    var bh = H - FIRE_Y;
-    c.save();
-    var g = c.createLinearGradient(0, FIRE_Y, 0, H);
-    g.addColorStop(0, 'rgba(14,20,34,0)');
-    g.addColorStop(1, 'rgba(14,20,34,.34)');
-    c.fillStyle = g; c.fillRect(0, FIRE_Y, W, bh);
-    c.globalAlpha = pulse;
-    c.strokeStyle = a.col; c.lineWidth = 5;
-    G.roundRect(c, 16, FIRE_Y + 10, W - 32, bh - 22, 26); c.stroke();
-    c.restore();
-
-    // l'oggetto due volte, ai lati del kart, cosi cade sotto tutte e due le mani
-    if (A.arma) {
-      A.arma(c, 150, FIRE_Y + bh * 0.5, 66, S.ammo, G.t);
-      A.arma(c, W - 150, FIRE_Y + bh * 0.5, 66, S.ammo, G.t);
-    }
-    G.text('TIRA!', W / 2, FIRE_Y + bh * 0.5, {
-      ctx: c, size: 38, color: a.col, stroke: 'rgba(12,20,34,.85)', strokeWidth: 10
-    });
-
-    if (S.armaFlash > 0) {
-      c.save();
-      c.globalAlpha = Math.min(1, S.armaFlash * 1.4);
-      G.text(a.nome, W / 2, 250, {
-        ctx: c, size: 76, color: a.col, stroke: 'rgba(12,20,34,.85)', strokeWidth: 14
+  G.scene('coppe', {
+    hud: false, back: false,
+    draw: function (c) {
+      bg(c);
+      G.text('Gran Premio', 640, 64, { size: 60, color: '#fff', stroke: '#1b2b3a', strokeWidth: 10 });
+      G.tracks.CUPS.forEach(function (cup, i) {
+        var x = 110 + i * 550, y = 120, open = cupOpen(i);
+        c.fillStyle = '#fff6e0'; G.roundRect(c, x, y, 510, 460, 30); c.fill();
+        G.text(cup.name, x + 255, y + 50, { size: 40, color: C.leafDeep });
+        cup.tracks.forEach(function (ti, j) { var T = G.tracks.TRACKS[ti], cx = x + 30 + (j % 2) * 230, cy = y + 90 + Math.floor(j / 2) * 170; themeCard(c, T, cx, cy, 220, 150); miniTrack(c, T, cx + 55, cy + 12, 110); G.text(T.name, cx + 110, cy + 136, { size: 18, color: '#fff', stroke: '#1b2b3a', strokeWidth: 5, maxWidth: 210 }); });
+        trophyIcon(c, trophyOf(i), x + 470, y + 50, .9);
+        if (!open) { c.fillStyle = 'rgba(23,40,55,.72)'; G.roundRect(c, x, y, 510, 460, 30); c.fill(); G.text('Vinci una coppa', x + 255, y + 210, { size: 32, color: '#fff' }); G.text('nella Coppa Frutta', x + 255, y + 255, { size: 32, color: '#fff' }); }
+        G.ui.button({ id: 'cup' + i, ghost: true, x: x, y: y, w: 510, h: 460, r: 30, onTap: function () {
+          if (!open) { G.sfx('bad'); G.say('Prima vinci una coppa nella Coppa Frutta'); return; }
+          GP = { cup: i, idx: 0, pts: {}, cols: {} }; G.go('gara', { ti: cup.tracks[0], gp: true });
+        } });
       });
-      c.restore();
+      G.ui.button({ id: 'back', x: 24, y: 610, w: 240, h: 90, color: C.tangerine, label: 'Indietro', onTap: function () { G.go('menu'); } });
     }
-  }
+  });
 
-  function drawRaceHud(c) {
-    if (S.phase === 'fine') return;
-    drawMap(c);
-    drawFireBar(c);
-    if (S.flash > 0) {
-      c.save();
-      c.globalAlpha = Math.min(0.75, S.flash * 1.7);
-      c.fillStyle = '#dff4ff'; c.fillRect(0, 0, W, H);
-      c.restore();
-    }
-    A.pill(c, 500, 104, 130, 74, 'GIRO', S.lap + '/' + S.laps);
-    A.pill(c, 646, 104, 130, 74, 'POSTO', S.place + '/' + (rivals.length + 1),
-      S.place === 1 ? '#7ee787' : (S.place > 4 ? '#ff8f8f' : null));
-    A.pill(c, 792, 104, 190, 74, 'TEMPO', fmtT(S.lapT));
-    var kmh = Math.round(S.spd / MAX_SPD * 120);
-    A.pill(c, 1090, H - 104, 150, 74, null, kmh,
-      S.off > 0.4 ? '#ff8f8f' : (S.boost > 0 ? '#7ee787' : null));
-
-    if (S.lapShown > 0 && S.t < 3.2 && S.lap > 1) {
-      G.text((S.newBest ? 'GIRO RECORD  ' : 'giro  ') + fmtT(S.lapShown), W / 2, 232, {
-        ctx: c, size: 40, color: S.newBest ? C.sun : '#e8eef7',
-        stroke: 'rgba(12,20,34,.8)', strokeWidth: 9
+  G.scene('piste', {
+    hud: false, back: false,
+    draw: function (c) {
+      bg(c);
+      G.text('Scegli la pista', 640, 58, { size: 54, color: '#fff', stroke: '#1b2b3a', strokeWidth: 10 });
+      G.tracks.TRACKS.forEach(function (T, i) {
+        var x = 60 + (i % 4) * 296, y = 110 + Math.floor(i / 4) * 236, open = cupOpen(T.cup), best = save().best[T.id + G.level];
+        themeCard(c, T, x, y, 276, 216); miniTrack(c, T, x + 78, y + 14, 120);
+        G.text(T.name, x + 138, y + 160, { size: 24, color: '#fff', stroke: '#1b2b3a', strokeWidth: 6, maxWidth: 260 });
+        if (best) G.text('Record ' + Math.floor(best / 60) + ':' + ('0' + (best % 60).toFixed(1)).slice(-4), x + 138, y + 194, { size: 18, color: '#fff', stroke: '#1b2b3a', strokeWidth: 4 });
+        if (!open) { c.fillStyle = 'rgba(23,40,55,.7)'; G.roundRect(c, x, y, 276, 216, 18); c.fill(); }
+        G.ui.button({ id: 'tr' + i, ghost: true, x: x, y: y, w: 276, h: 216, r: 18, onTap: function () { if (open) { GP = null; G.go('gara', { ti: i }); } else { G.sfx('bad'); G.say('Si apre vincendo una coppa nella Coppa Frutta'); } } });
       });
+      G.ui.button({ id: 'back', x: 24, y: 610, w: 240, h: 90, color: C.tangerine, label: 'Indietro', onTap: function () { G.go('menu'); } });
     }
+  });
+
+  /* called by the race scene when a Grand Prix race ends */
+  G.gpRecord = function (results) {
+    if (!GP) return;
+    results.forEach(function (r) { GP.pts[r.name] = (GP.pts[r.name] || 0) + r.points; GP.cols[r.name] = r.col; });
+    GP.last = results;
+    var me = results.filter(function (r) { return r.player; })[0], s = save(), T = G.tracks.TRACKS[G.tracks.CUPS[GP.cup].tracks[GP.idx]];
+    if (me && (!s.best[T.id + G.level] || me.time < s.best[T.id + G.level])) s.best[T.id + G.level] = Math.round(me.time * 10) / 10;
+    G.saveNow();
+  };
+  G.gpState = function () { return GP; };
+  G.gpStart = function (cup) { GP = { cup: cup, idx: 0, pts: {}, cols: {} }; return GP; };
+  G.kartCupOpen = cupOpen;
+  G.kartBestSingle = function (S) {
+    var me = S.results.filter(function (r) { return r.player; })[0], s = save(), T = G.tracks.TRACKS[S.ti], k = T.id + G.level;
+    if (me && (!s.best[k] || me.time < s.best[k])) { s.best[k] = Math.round(me.time * 10) / 10; G.saveNow(); }
+  };
+  function standings() {
+    return Object.keys(GP.pts).map(function (n) { return { name: n, pts: GP.pts[n], col: GP.cols[n], player: G.account && n === G.account.name }; }).sort(function (a, b) { return b.pts - a.pts; });
   }
 
-  /* Three lights and a word. The moment the race begins has to exist. */
-  function drawLights(c) {
-    var i, on;
-    for (i = 0; i < 3; i++) {
-      on = S.lit > i;
-      c.save();
-      c.fillStyle = on ? (i === 2 ? '#7ee787' : C.sun) : 'rgba(255,246,224,.22)';
-      c.beginPath(); c.arc(W / 2 - 110 + i * 110, 250, 40, 0, 6.2832); c.fill();
-      c.strokeStyle = 'rgba(14,20,34,.7)'; c.lineWidth = 6; c.stroke();
-      c.restore();
-    }
-    G.text(S.lit >= 3 ? 'VIA!' : 'Pronti...', W / 2, 358, {
-      ctx: c, size: S.lit >= 3 ? 74 : 52, color: S.lit >= 3 ? '#7ee787' : '#fff6e0',
-      stroke: 'rgba(12,20,34,.8)', strokeWidth: 12
-    });
-  }
-
-  /* The end of the race, which the game did not have at all: the full order,
-     your place, and the two things you can do next. */
-  function drawResults(c) {
-    var i, o, y;
-    c.save(); c.fillStyle = 'rgba(9,16,30,.72)'; c.fillRect(0, 0, W, H); c.restore();
-
-    G.text(S.place === 1 ? 'HAI VINTO!' : S.place + 'º POSTO', W / 2, 96, {
-      ctx: c, size: 66, color: S.place === 1 ? C.sun : '#e8eef7',
-      stroke: 'rgba(12,20,34,.8)', strokeWidth: 12
-    });
-
-    for (i = 0; i < (S.order || []).length; i++) {
-      o = S.order[i];
-      y = 156 + i * 66;
-      c.save();
-      c.fillStyle = o.me ? 'rgba(255,215,94,.20)' : 'rgba(255,246,224,.08)';
-      G.roundRect(c, 400, y, 480, 56, 14); c.fill();
-      c.restore();
-      G.text(String(i + 1), 436, y + 30, { ctx: c, size: 30, color: '#e8eef7' });
-      c.save();
-      c.fillStyle = o.color;
-      c.beginPath(); c.arc(486, y + 28, 17, 0, 6.2832); c.fill();
-      c.strokeStyle = 'rgba(12,20,34,.7)'; c.lineWidth = 3; c.stroke();
-      c.restore();
-      G.text(o.name, 530, y + 30, {
-        ctx: c, size: 30, color: o.me ? C.sun : '#e8eef7', align: 'left'
+  G.scene('classifica', {
+    hud: false, back: false,
+    draw: function (c) {
+      if (!GP) { G.go('menu'); return; }
+      bg(c, '#1b2b3a', '#2b5876');
+      var cup = G.tracks.CUPS[GP.cup], last = GP.idx >= cup.tracks.length - 1;
+      G.text(cup.name + ' · gara ' + (GP.idx + 1) + ' di ' + cup.tracks.length, 640, 56, { size: 40, color: '#ffd75e' });
+      standings().forEach(function (r, i) {
+        var y = 120 + i * 58, w = 200 + r.pts * 9;
+        c.fillStyle = r.player ? '#ffe9a8' : 'rgba(255,255,255,.12)'; G.roundRect(c, 200, y - 24, 880, 50, 16); c.fill();
+        G.text((i + 1) + '°', 240, y, { size: 30, color: r.player ? C.ink : '#fff' });
+        c.fillStyle = r.col; G.roundRect(c, 290, y - 14, Math.min(560, w), 28, 14); c.fill();
+        G.text(r.name, 304, y, { size: 22, color: '#1b2b3a', align: 'left', maxWidth: 200 });
+        G.text(r.pts + ' punti', 1010, y, { size: 26, color: r.player ? C.ink : '#fff' });
       });
+      G.ui.button({ id: 'next', x: 440, y: 600, w: 400, h: 100, r: 28, color: C.leaf, label: last ? 'Il podio!' : 'Prossima gara', fontSize: 36, onTap: function () {
+        if (last) G.go('podio'); else { GP.idx++; G.go('gara', { ti: cup.tracks[GP.idx], gp: true }); }
+      } });
     }
+  });
 
-    var g = G.kartSave ? G.kartSave() : null;
-    if (g) {
-      G.text('giro migliore ' + fmtT(g.best[TRACKS[S.track].id]) + '   ·   premi presi ' + S.took,
-        W / 2, 156 + 6 * 66 + 6, {
-          ctx: c, size: 26, color: 'rgba(255,246,224,.75)', weight: 800
-        });
-    }
-
-    G.ui.button({
-      id: 'kagain', x: 330, y: H - 116, w: 280, h: 92, r: 26, color: C.leaf,
-      label: 'Ancora!', fontSize: 36, onTap: function () { G.go('pista'); }
-    });
-    G.ui.button({
-      id: 'kmenu', x: 670, y: H - 116, w: 280, h: 92, r: 26, color: C.tangerine,
-      label: 'Menu', fontSize: 36, onTap: function () { G.go('menu'); }
-    });
-  }
-
-  function quad(c, x1, y1, w1, x2, y2, w2, col) {
-    c.fillStyle = col;
-    c.beginPath();
-    c.moveTo(x1 - w1, y1);
-    c.lineTo(x2 - w2, y2);
-    c.lineTo(x2 + w2, y2);
-    c.lineTo(x1 + w1, y1);
-    c.closePath();
-    c.fill();
-  }
-
-  /* The player's kart sits at a fixed place on screen and only leans; the world
-     moves under it. Its sideways drift on screen is small on purpose — a kart
-     that slides across the whole screen makes the road look like it is sliding
-     instead. */
-  function drawKart(c) {
-    var lean = S.leanShown;
-    var bump = Math.sin(S.z * 0.004) * (S.spd / MAX_SPD) * (S.off > 0.4 ? 2.6 : 0.6)
-      + Math.sin(G.t * 48) * S.bump * 8;
-    var kx = W / 2;
-
-    if (S.shield > 0) {
-      var glow = 0.50 + 0.28 * Math.sin(G.t * 9);
-      c.save();
-      c.globalAlpha = glow;
-      c.strokeStyle = ARMI.scudo.col; c.lineWidth = 7;
-      c.fillStyle = 'rgba(95,214,255,.12)';
-      c.beginPath(); c.ellipse(kx, H - 164, 142, 150, 0, 0, 6.2832); c.fill(); c.stroke();
-      c.restore();
-    }
-
-    /* The drift charge, said in colour and nothing else. There is no gauge and
-       no number: white sparks, then blue, then orange, and letting go while the
-       sparks are coloured is the whole mechanic. A six-year-old learns that in
-       two corners; a three-year-old never has to. */
-    if (S.drift > 0.35 && S.phase === 'gara') {
-      var stage = S.drift >= DRIFT_2 ? 2 : (S.drift >= DRIFT_1 ? 1 : 0);
-      var col = ['rgba(255,246,224,.85)', '#7fd7ff', '#ffb545'][stage];
-      var sd = S.steer > 0 ? -1 : 1;            // sparks fly off the outside wheel
-      c.save();
-      for (var i = 0; i < 7; i++) {
-        var ph = G.t * 22 + i * 1.7;
-        var sx = kx + sd * (104 + (i % 3) * 12) + Math.sin(ph) * 12;
-        var sy = H - 78 + Math.cos(ph * 1.3) * 16;
-        var r = (3 + (i % 3) * 2.4) * (0.7 + stage * 0.35);
-        c.globalAlpha = 0.35 + 0.55 * Math.abs(Math.sin(ph * 0.8));
-        c.fillStyle = col;
-        c.beginPath(); c.arc(sx, sy, r, 0, 6.2832); c.fill();
+  G.scene('podio', {
+    hud: false, back: false,
+    enter: function () {
+      if (!GP) return;
+      var st = standings(), mine = st.findIndex(function (r) { return r.player; }) + 1, s = save();
+      GP.final = st; GP.place = mine;
+      if (mine <= 3) { s.cups[GP.cup] = s.cups[GP.cup] || {}; var prev = s.cups[GP.cup][G.level]; if (!prev || mine < prev) s.cups[GP.cup][G.level] = mine; G.saveNow(); }
+      setTimeout(function () {
+        if (G.current !== 'podio') return;
+        G.sfx('win'); G.fx.confetti();
+        G.say(mine === 1 ? 'Coppa d\'oro! Sei il campione!' : mine === 2 ? 'Coppa d\'argento! Bravissimo!' : mine === 3 ? 'Coppa di bronzo! Che bello!' : 'Che gare! Riprova per salire sul podio.');
+      }, 300);
+    },
+    draw: function (c) {
+      if (!GP) { G.go('menu'); return; }
+      bg(c, '#2b1d50', '#ff9f43');
+      var st = GP.final, a = G.t * .25;
+      if (GL.frame({ w: 1280, h: 720, eye: [Math.sin(a) * 4, 7.5, 17], at: [0, 2.6, 0], fov: .85, sky: '#000000', fog: [500, 900] })) {
+        GL.draw(G.models.podium(), M4.ident());
+        [[0, 3.05, 0], [-4, 2.05, 1], [4, 1.25, 2]].forEach(function (p, i) { if (st[i]) GL.draw(G.models.kart(st[i].col), M4.mul(M4.trans(p[0], p[1], 0), M4.rotY(Math.sin(G.t * 2 + i) * .3))); });
+        if (GP.place <= 3) GL.draw(G.models.trophy(['#ffd75e', '#d9dee3', '#e0a066'][GP.place - 1]), M4.mul(M4.trans(7.5, 0, 3), M4.rotY(G.t)));
+        c.drawImage(GL.R.canvas, 0, 0, W, H);
       }
-      c.restore();
+      G.text(GP.place <= 3 ? ['Coppa d\'oro!', 'Coppa d\'argento!', 'Coppa di bronzo!'][GP.place - 1] : GP.place + '° in classifica', 640, 70, { size: 66, color: '#ffd75e', stroke: '#1b2b3a', strokeWidth: 12 });
+      st.slice(0, 3).forEach(function (r, i) { G.text((i + 1) + '° ' + r.name, [640, 360, 920][i], [600, 640, 660][i], { size: 30, color: '#fff', stroke: '#1b2b3a', strokeWidth: 7 }); });
+      G.ui.button({ id: 'done', x: 1000, y: 610, w: 256, h: 90, color: C.leaf, label: 'Menu', onTap: function () { GP = null; G.go('menu'); } });
     }
-
-    A.kartBack(c, kx, H - 74, (CAM_D / CAM_BACK) * KART_W * W / 2, {
-      color: (G.account && G.account.color) || C.dino,
-      lean: lean,
-      bob: bump,
-      hat: typeof G.save.hat === 'string' ? G.save.hat : null,
-      boost: S.boost || 0
-    });
-  }
+  });
 })();
 
 
